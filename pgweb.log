@@ -1,0 +1,4 @@
+nohup: ignoring input
+Pgweb v0.14.0 (git: 6b3c177909f6a9ef1ebd7c1d4062e9f597e676b9) (go: go1.19.4) (build time: 2023-02-21T17:40:38Z) (arch: linux/amd64)
+Connecting to server...
+Error: pq: SSL is not enabled on the server
