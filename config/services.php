@@ -35,4 +35,9 @@ return [
         ],
     ],
 
+    'bills_payment' => [
+        'jwt_token' => env('BILLS_PAYMENT_JWT_TOKEN', 'your-jwt-token-here'),
+        'digital_signature' => env('BILLS_PAYMENT_DIGITAL_SIGNATURE', 'your-digital-signature-here'),
+    ],
+
 ];
