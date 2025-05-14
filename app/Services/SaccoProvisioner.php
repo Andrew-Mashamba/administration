@@ -13,17 +13,25 @@ class SaccoProvisioner
 {
     private function checkDockerInstallation()
     {
-        exec('docker --version', $output, $returnCode);
+        // Check Docker installation
+        exec('which docker', $output, $returnCode);
         if ($returnCode !== 0) {
-            throw new Exception("Docker is not installed or not accessible. Please install Docker Desktop and ensure it's running.");
+            throw new Exception("Docker is not installed. Please install Docker using: sudo yum install docker-ce docker-ce-cli containerd.io (CentOS) or sudo apt-get install docker-ce docker-ce-cli containerd.io (Ubuntu)");
         }
-        Log::info("Docker version: " . implode("\n", $output));
 
-        // Check if Docker daemon is running
-        exec('docker info', $output, $returnCode);
+        // Check Docker daemon
+        exec('systemctl is-active docker', $output, $returnCode);
         if ($returnCode !== 0) {
-            throw new Exception("Docker daemon is not running. Please start Docker Desktop.");
+            throw new Exception("Docker daemon is not running. Please start it using: sudo systemctl start docker");
         }
+
+        // Check Docker Compose
+        exec('which docker-compose', $output, $returnCode);
+        if ($returnCode !== 0) {
+            throw new Exception("Docker Compose is not installed. Please install it using: sudo curl -L \"https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)\" -o /usr/local/bin/docker-compose && sudo chmod +x /usr/local/bin/docker-compose");
+        }
+
+        Log::info("Docker and Docker Compose are properly installed and running");
     }
 
     private function copyDirectoryWithProgress($source, $destination)
@@ -38,6 +46,18 @@ class SaccoProvisioner
             File::makeDirectory($destination, 0755, true);
         }
 
+        // Use rsync if available for better performance
+        exec('which rsync', $output, $returnCode);
+        if ($returnCode === 0) {
+            $rsyncCommand = "rsync -av --progress {$source}/ {$destination}/";
+            exec($rsyncCommand, $output, $returnCode);
+            if ($returnCode === 0) {
+                Log::info("Directory copied successfully using rsync");
+                return;
+            }
+        }
+
+        // Fallback to PHP's copy if rsync fails
         $iterator = new \RecursiveIteratorIterator(
             new \RecursiveDirectoryIterator($source, \RecursiveDirectoryIterator::SKIP_DOTS),
             \RecursiveIteratorIterator::SELF_FIRST
@@ -61,7 +81,7 @@ class SaccoProvisioner
 
             if ($currentFile % 10 === 0) {
                 $progress = round(($currentFile / $totalFiles) * 100, 2);
-                //Log::info("Copying files... {$progress}% complete");
+                Log::info("Copying files... {$progress}% complete");
             }
         }
 
@@ -72,6 +92,7 @@ class SaccoProvisioner
     {
         try {
             set_time_limit(0);
+            ini_set('memory_limit', '512M');
 
             if (empty($alias) || empty($dbName) || empty($dbHost)) {
                 throw new Exception("Alias, database name, and database host are required");
@@ -86,13 +107,15 @@ class SaccoProvisioner
 
             $baseDir = dirname(base_path());
             $instancesDir = "{$baseDir}/instances";
-            $baseTemplate = "{$baseDir}/template_v3";
+            $baseTemplate = "{$baseDir}/template";
             $dockerDir = "{$baseDir}/docker";
             $targetPath = "{$instancesDir}/{$alias}";
 
+            // Ensure proper permissions
             foreach ([$instancesDir, $dockerDir] as $dir) {
                 if (!File::exists($dir)) {
                     File::makeDirectory($dir, 0755, true);
+                    exec("chmod -R 755 {$dir}");
                     Log::info("Created directory: {$dir}");
                 }
             }
@@ -130,6 +153,7 @@ class SaccoProvisioner
                 $envTemplate
             );
             File::put("{$targetPath}/.env", $envContent);
+            exec("chmod 644 {$targetPath}/.env");
             Log::info(".env file generated successfully");
 
             Log::info("Step 4: Creating Dockerfile");
@@ -151,11 +175,12 @@ RUN apt-get update && apt-get install -y \\
     libjpeg62-turbo-dev \\
     libfreetype6-dev \\
     nodejs \\
-    npm
+    npm \\
+    && rm -rf /var/lib/apt/lists/*
 
 # Install PHP extensions
-RUN docker-php-ext-configure gd --with-freetype --with-jpeg
-RUN docker-php-ext-install pdo pdo_pgsql pgsql gd mbstring zip exif pcntl bcmath
+RUN docker-php-ext-configure gd --with-freetype --with-jpeg \\
+    && docker-php-ext-install -j$(nproc) pdo pdo_pgsql pgsql gd mbstring zip exif pcntl bcmath
 
 # Install Composer
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
@@ -173,14 +198,13 @@ COPY . /var/www/html
 RUN composer install --no-interaction --optimize-autoloader --no-dev
 
 # Set permissions
-RUN chown -R www-data:www-data /var/www/html/storage
-RUN chown -R www-data:www-data /var/www/html/bootstrap/cache
-RUN chmod -R 775 /var/www/html/storage
-RUN chmod -R 775 /var/www/html/bootstrap/cache
+RUN chown -R www-data:www-data /var/www/html/storage \\
+    && chown -R www-data:www-data /var/www/html/bootstrap/cache \\
+    && chmod -R 775 /var/www/html/storage \\
+    && chmod -R 775 /var/www/html/bootstrap/cache
 
 # Build frontend assets
-RUN npm install
-RUN npm run build
+RUN npm install && npm run build
 
 # Expose port 80
 EXPOSE 80
@@ -190,25 +214,29 @@ CMD ["apache2-foreground"]
 DOCKERFILE;
 
             File::put($dockerFilePath, $dockerfileContent);
+            exec("chmod 644 {$dockerFilePath}");
             Log::info("Dockerfile created at: {$dockerFilePath}");
 
             Log::info("Step 5: Creating docker-compose file");
             $port = rand(8100, 8999);
             $compose = <<<YML
+version: '3.8'
+
 services:
   {$alias}_app:
     build:
-      context: D:/PROJECTS2025/LARAVEL/nbc_saccos/instances/{$alias}
-      dockerfile: D:/PROJECTS2025/LARAVEL/nbc_saccos/docker/Dockerfile
+      context: {$targetPath}
+      dockerfile: {$dockerDir}/Dockerfile
     container_name: {$alias}_app
     volumes:
-      - D:/PROJECTS2025/LARAVEL/nbc_saccos/instances/{$alias}:/var/www/html
+      - {$targetPath}:/var/www/html
     environment:
       - APACHE_DOCUMENT_ROOT=/var/www/html/public
     ports:
       - "{$port}:80"
     networks:
       - saccos_net
+    restart: unless-stopped
 
 networks:
   saccos_net:
@@ -217,35 +245,20 @@ YML;
 
             $composePath = "{$dockerDir}/docker-compose.{$alias}.yml";
             File::put($composePath, $compose);
+            exec("chmod 644 {$composePath}");
             Log::info("Docker compose file created at: {$composePath}");
 
             Log::info("Step 6: Starting Docker container");
             putenv('COMPOSE_BAKE=true');
-            //$dockerCommand = 'docker compose -f "' . $composePath . '" up -d --build';
-            $dockerCommand  = "docker compose -f " . escapeshellarg($composePath) . " up -d";
+            
+            // Execute the script with proper path
+            $upCommand = "cd {$baseDir} && docker compose -f {$composePath} up -d --build";
+            exec($upCommand, $output, $returnCode);
 
-
-
-            $scriptPath = "{$dockerDir}/run_docker.sh";
-$scriptContent = <<<BASH
-#!/bin/bash
-docker compose -f docker/docker-compose.{$alias}.yml up -d
-BASH;
-
-File::put($scriptPath, $scriptContent);
-chmod($scriptPath, 0755);
-
-// Execute the script
-$upCommand = "bash {$scriptPath}";
-exec($upCommand, $output, $returnCode);
-
-
-
-            //exec($dockerCommand, $output, $returnCode);
             if ($returnCode !== 0) {
                 $errorOutput = implode("\n", $output);
                 Log::error("Docker command failed", [
-                    'command' => $dockerCommand,
+                    'command' => $upCommand,
                     'output' => $errorOutput,
                     'returnCode' => $returnCode
                 ]);
