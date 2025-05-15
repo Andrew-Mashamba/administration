@@ -392,7 +392,7 @@ CONF;
 
         $commands = [
             'composer install --no-interaction --optimize-autoloader',
-            'php artisan migrate:fresh --force',  // Fresh migration
+            'php artisan migrate:fresh --force --path=database/migrations',  // Specify migrations path
             'php artisan db:seed',
             //'npm install',
             //'npm run build',
@@ -406,11 +406,17 @@ CONF;
                 'targetPath' => $targetPath
             ]);
 
-            $fullCommand = "cd {$targetPath} && {$command}";
-            exec($fullCommand, $output, $returnCode);
+            // Change to target directory before running command
+            $currentDir = getcwd();
+            chdir($targetPath);
+            
+            exec($command, $output, $returnCode);
+            
+            // Change back to original directory
+            chdir($currentDir);
             
             Log::info("Command execution result", [
-                'command' => $fullCommand,
+                'command' => $command,
                 'output' => $output,
                 'returnCode' => $returnCode
             ]);
@@ -418,13 +424,13 @@ CONF;
             if ($returnCode !== 0) {
                 $errorOutput = implode("\n", $output);
                 Log::error("Command failed", [
-                    'command' => $fullCommand,
+                    'command' => $command,
                     'output' => $errorOutput,
                     'returnCode' => $returnCode
                 ]);
                 throw new Exception("Failed to execute command: {$command}. Error: {$errorOutput}");
             }
-            Log::info("Successfully executed command", ['command' => $fullCommand]);
+            Log::info("Successfully executed command", ['command' => $command]);
         }
     }
 
