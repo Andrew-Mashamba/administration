@@ -8,35 +8,98 @@ use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Log;
 use PDO;
 use Exception;
+use Symfony\Component\Process\Process;
+use Symfony\Component\Process\Exception\ProcessFailedException;
 
 class SaccoProvisioner
 {
-    private function checkDockerInstallation()
+    private $dockerLogger;
+    private $baseDir;
+    private $instancesDir;
+    private $dockerDir;
+
+    public function __construct()
     {
+        $this->dockerLogger = Log::channel('docker');
+        $this->baseDir = dirname(base_path());
+        $this->instancesDir = "{$this->baseDir}/instances";
+        $this->dockerDir = "{$this->baseDir}/docker";
+    }
+
+    private function executeCommand(string $command, array $env = [], bool $throwOnError = true): array
+    {
+        $process = new Process(explode(' ', $command));
+        $process->setEnv($env);
+        $process->setTimeout(3600); // 1 hour timeout
+        
+        try {
+            $process->mustRun();
+            $output = $process->getOutput();
+            $this->dockerLogger->info("Command executed successfully", [
+                'command' => $command,
+                'output' => $output
+            ]);
+            
+            return [
+                'success' => true,
+                'output' => $output,
+                'exit_code' => $process->getExitCode()
+            ];
+        } catch (ProcessFailedException $e) {
+            $errorOutput = $e->getProcess()->getErrorOutput();
+            $this->dockerLogger->error("Command execution failed", [
+                'command' => $command,
+                'error' => $errorOutput,
+                'exit_code' => $e->getProcess()->getExitCode()
+            ]);
+            
+            if ($throwOnError) {
+                throw new Exception("Command failed: {$command}. Error: {$errorOutput}");
+            }
+            
+            return [
+                'success' => false,
+                'output' => $errorOutput,
+                'exit_code' => $e->getProcess()->getExitCode()
+            ];
+        }
+    }
+
+    private function checkDockerInstallation(): void
+    {
+        $this->dockerLogger->info("Checking Docker installation");
+        
         // Check Docker installation
-        exec('which docker', $output, $returnCode);
-        if ($returnCode !== 0) {
+        $result = $this->executeCommand('which docker', [], false);
+        if (!$result['success']) {
             throw new Exception("Docker is not installed. Please install Docker using: sudo yum install docker-ce docker-ce-cli containerd.io (CentOS) or sudo apt-get install docker-ce docker-ce-cli containerd.io (Ubuntu)");
         }
 
         // Check Docker daemon
-        exec('systemctl is-active docker', $output, $returnCode);
-        if ($returnCode !== 0) {
+        $result = $this->executeCommand('systemctl is-active docker', [], false);
+        if (!$result['success'] || trim($result['output']) !== 'active') {
             throw new Exception("Docker daemon is not running. Please start it using: sudo systemctl start docker");
         }
 
         // Check Docker Compose
-        exec('which docker-compose', $output, $returnCode);
-        if ($returnCode !== 0) {
+        $result = $this->executeCommand('which docker-compose', [], false);
+        if (!$result['success']) {
             throw new Exception("Docker Compose is not installed. Please install it using: sudo curl -L \"https://github.com/docker/compose/releases/latest/download/docker-compose-$(uname -s)-$(uname -m)\" -o /usr/local/bin/docker-compose && sudo chmod +x /usr/local/bin/docker-compose");
         }
 
-        Log::info("Docker and Docker Compose are properly installed and running");
+        // Verify Docker functionality
+        $result = $this->executeCommand('docker info', [], false);
+        if (!$result['success']) {
+            throw new Exception("Docker is not functioning properly. Error: {$result['output']}");
+        }
+
+        $this->dockerLogger->info("Docker and Docker Compose are properly installed and running");
     }
 
-    private function copyDirectoryWithProgress($source, $destination)
+    private function copyDirectoryWithProgress(string $source, string $destination): void
     {
         set_time_limit(0);
+        $this->dockerLogger->info("Starting directory copy from {$source} to {$destination}");
 
         if (!File::exists($source)) {
             throw new Exception("Source directory not found: {$source}");
@@ -44,17 +107,23 @@ class SaccoProvisioner
 
         if (!File::exists($destination)) {
             File::makeDirectory($destination, 0755, true);
+            $this->dockerLogger->info("Created destination directory: {$destination}");
         }
 
         // Use rsync if available for better performance
-        exec('which rsync', $output, $returnCode);
-        if ($returnCode === 0) {
+        $result = $this->executeCommand('which rsync', [], false);
+        if ($result['success']) {
             $rsyncCommand = "rsync -av --progress {$source}/ {$destination}/";
-            exec($rsyncCommand, $output, $returnCode);
-            if ($returnCode === 0) {
-                Log::info("Directory copied successfully using rsync");
+            $result = $this->executeCommand($rsyncCommand, [], false);
+            
+            if ($result['success']) {
+                $this->dockerLogger->info("Directory copied successfully using rsync");
                 return;
             }
+            
+            $this->dockerLogger->warning("Rsync failed, falling back to PHP copy", [
+                'error' => $result['output']
+            ]);
         }
 
         // Fallback to PHP's copy if rsync fails
@@ -81,14 +150,14 @@ class SaccoProvisioner
 
             if ($currentFile % 10 === 0) {
                 $progress = round(($currentFile / $totalFiles) * 100, 2);
-                Log::info("Copying files... {$progress}% complete");
+                $this->dockerLogger->info("Copying files... {$progress}% complete");
             }
         }
 
-        Log::info("Directory copy completed: {$totalFiles} files copied");
+        $this->dockerLogger->info("Directory copy completed: {$totalFiles} files copied");
     }
 
-    public function provisionWithDocker($alias, $dbName, $dbHost, $dbUser = 'postgres', $dbPassword = 'postgres')
+    public function provisionWithDocker(string $alias, string $dbName, string $dbHost, string $dbUser = 'postgres', string $dbPassword = 'postgres'): array
     {
         try {
             set_time_limit(0);
@@ -98,67 +167,112 @@ class SaccoProvisioner
                 throw new Exception("Alias, database name, and database host are required");
             }
 
-            $this->checkDockerInstallation();
-
             $alias = Str::slug($alias);
             $dbName = Str::slug($dbName, '_');
 
-            Log::info("Starting provisioning process for alias: {$alias}, database: {$dbName} on host: {$dbHost}");
+            $this->dockerLogger->info("Starting provisioning process", [
+                'alias' => $alias,
+                'database' => $dbName,
+                'host' => $dbHost
+            ]);
 
-            $baseDir = dirname(base_path());
-            $instancesDir = "{$baseDir}/instances";
-            $baseTemplate = "{$baseDir}/template";
-            $dockerDir = "{$baseDir}/docker";
-            $targetPath = "{$instancesDir}/{$alias}";
+            $this->checkDockerInstallation();
+
+            $baseTemplate = "{$this->baseDir}/template";
+            $targetPath = "{$this->instancesDir}/{$alias}";
 
             // Ensure proper permissions
-            foreach ([$instancesDir, $dockerDir] as $dir) {
+            foreach ([$this->instancesDir, $this->dockerDir] as $dir) {
                 if (!File::exists($dir)) {
                     File::makeDirectory($dir, 0755, true);
-                    exec("chmod -R 755 {$dir}");
-                    Log::info("Created directory: {$dir}");
+                    $this->executeCommand("chmod -R 755 {$dir}");
+                    $this->dockerLogger->info("Created directory: {$dir}");
                 }
             }
 
-            Log::info("Step 1: Cloning template from {$baseTemplate} to {$targetPath}");
+            $this->dockerLogger->info("Step 1: Cloning template");
             $this->copyDirectoryWithProgress($baseTemplate, $targetPath);
-            Log::info("Template cloned successfully");
 
-            Log::info("Step 2: Creating database {$dbName} on {$dbHost}");
+            $this->dockerLogger->info("Step 2: Creating database");
             $this->createRemoteDatabase($dbHost, $dbName, $dbUser, $dbPassword);
 
-            Log::info("Step 3: Generating .env file");
-            $envTemplatePath = "{$baseTemplate}/.env";
-            if (!File::exists($envTemplatePath)) {
-                throw new Exception("Template .env file not found at: {$envTemplatePath}");
-            }
-            $envTemplate = File::get($envTemplatePath);
-            $envContent = str_replace(
-                [
-                    'DB_CONNECTION=mysql',
-                    'DB_DATABASE=laravel',
-                    'DB_USERNAME=root',
-                    'DB_PASSWORD=',
-                    'DB_HOST=127.0.0.1',
-                    'DB_PORT=3306',
-                ],
-                [
-                    'DB_CONNECTION=pgsql',
-                    "DB_DATABASE={$dbName}",
-                    "DB_USERNAME={$dbUser}",
-                    "DB_PASSWORD={$dbPassword}",
-                    "DB_HOST={$dbHost}",
-                    'DB_PORT=5432',
-                ],
-                $envTemplate
-            );
-            File::put("{$targetPath}/.env", $envContent);
-            exec("chmod 644 {$targetPath}/.env");
-            Log::info(".env file generated successfully");
+            $this->dockerLogger->info("Step 3: Generating .env file");
+            $this->generateEnvFile($targetPath, $dbName, $dbHost, $dbUser, $dbPassword);
 
-            Log::info("Step 4: Creating Dockerfile");
-            $dockerFilePath = "{$dockerDir}/Dockerfile";
-            $dockerfileContent = <<<DOCKERFILE
+            $this->dockerLogger->info("Step 4: Creating Dockerfile");
+            $this->createDockerfile($alias, $targetPath);
+
+            $this->dockerLogger->info("Step 5: Creating docker-compose file");
+            $port = $this->generateDockerComposeFile($alias, $targetPath);
+
+            $this->dockerLogger->info("Step 6: Starting Docker container");
+            $this->startDockerContainer($alias, $port);
+
+            $this->dockerLogger->info("Step 7: Running post-installation commands");
+            $this->runPostInstallationCommands($alias);
+
+            $this->dockerLogger->info("Provisioning completed successfully", [
+                'alias' => $alias,
+                'url' => "http://localhost:{$port}"
+            ]);
+
+            return [
+                'success' => true,
+                'url' => "http://localhost:{$port}",
+                'alias' => $alias,
+                'port' => $port
+            ];
+
+        } catch (Exception $e) {
+            $this->dockerLogger->error("Provisioning failed", [
+                'alias' => $alias ?? 'unknown',
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            // Attempt cleanup if possible
+            if (isset($alias) && isset($targetPath)) {
+                $this->cleanupFailedProvision($alias, $targetPath);
+            }
+            
+            throw $e;
+        }
+    }
+
+    private function generateEnvFile(string $targetPath, string $dbName, string $dbHost, string $dbUser, string $dbPassword): void
+    {
+        $envTemplatePath = "{$this->baseDir}/template/.env";
+        if (!File::exists($envTemplatePath)) {
+            throw new Exception("Template .env file not found at: {$envTemplatePath}");
+        }
+
+        $envContent = str_replace(
+            [
+                'DB_CONNECTION=mysql',
+                'DB_DATABASE=laravel',
+                'DB_USERNAME=root',
+                'DB_PASSWORD=',
+                'DB_HOST=127.0.0.1',
+                'DB_PORT=3306',
+            ],
+            [
+                'DB_CONNECTION=pgsql',
+                "DB_DATABASE={$dbName}",
+                "DB_USERNAME={$dbUser}",
+                "DB_PASSWORD={$dbPassword}",
+                "DB_HOST={$dbHost}",
+                'DB_PORT=5432',
+            ],
+            File::get($envTemplatePath)
+        );
+
+        File::put("{$targetPath}/.env", $envContent);
+        $this->executeCommand("chmod 644 {$targetPath}/.env");
+    }
+
+    private function createDockerfile(string $alias, string $targetPath): void
+    {
+        $dockerfileContent = <<<DOCKERFILE
 FROM php:8.2-apache
 
 # Install system dependencies
@@ -213,20 +327,22 @@ EXPOSE 80
 CMD ["apache2-foreground"]
 DOCKERFILE;
 
-            File::put($dockerFilePath, $dockerfileContent);
-            exec("chmod 644 {$dockerFilePath}");
-            Log::info("Dockerfile created at: {$dockerFilePath}");
+        $dockerFilePath = "{$this->dockerDir}/Dockerfile";
+        File::put($dockerFilePath, $dockerfileContent);
+        $this->executeCommand("chmod 644 {$dockerFilePath}");
+    }
 
-            Log::info("Step 5: Creating docker-compose file");
-            $port = rand(8100, 8999);
-            $compose = <<<YML
+    private function generateDockerComposeFile(string $alias, string $targetPath): int
+    {
+        $port = rand(8100, 8999);
+        $composeContent = <<<YML
 version: '3.8'
 
 services:
   {$alias}_app:
     build:
       context: {$targetPath}
-      dockerfile: {$dockerDir}/Dockerfile
+      dockerfile: {$this->dockerDir}/Dockerfile
     container_name: {$alias}_app
     volumes:
       - {$targetPath}:/var/www/html
@@ -243,96 +359,146 @@ networks:
     driver: bridge
 YML;
 
-            $composePath = "{$dockerDir}/docker-compose.{$alias}.yml";
-            File::put($composePath, $compose);
-            exec("chmod 644 {$composePath}");
-            Log::info("Docker compose file created at: {$composePath}");
+        $composePath = "{$this->dockerDir}/docker-compose.{$alias}.yml";
+        File::put($composePath, $composeContent);
+        $this->executeCommand("chmod 644 {$composePath}");
+        
+        return $port;
+    }
 
-            Log::info("Step 6: Starting Docker container");
-            putenv('COMPOSE_BAKE=true');
+    private function startDockerContainer(string $alias, int $port): void
+    {
+        $composePath = "{$this->dockerDir}/docker-compose.{$alias}.yml";
+        
+        // First try a clean build
+        $buildResult = $this->executeCommand(
+            "docker compose -f {$composePath} build",
+            ['COMPOSE_BAKE' => 'true'],
+            false
+        );
+        
+        if (!$buildResult['success']) {
+            $this->dockerLogger->warning("Initial build failed, attempting with --no-cache", [
+                'error' => $buildResult['output']
+            ]);
             
-            // Execute the script with proper path
-            $upCommand = "cd {$baseDir} && docker compose -f {$composePath} up -d --build";
-            exec($upCommand, $output, $returnCode);
+            $this->executeCommand(
+                "docker compose -f {$composePath} build --no-cache",
+                ['COMPOSE_BAKE' => 'true']
+            );
+        }
+        
+        // Start the container
+        $this->executeCommand(
+            "docker compose -f {$composePath} up -d",
+            ['COMPOSE_BAKE' => 'true']
+        );
+        
+        // Verify container is running
+        $checkResult = $this->executeCommand(
+            "docker inspect --format='{{.State.Status}}' {$alias}_app",
+            [],
+            false
+        );
+        
+        if (!trim($checkResult['output']) === 'running') {
+            throw new Exception("Container failed to start. Status: {$checkResult['output']}");
+        }
+        
+        $this->dockerLogger->info("Container started successfully on port {$port}");
+    }
 
-            if ($returnCode !== 0) {
-                $errorOutput = implode("\n", $output);
-                Log::error("Docker command failed", [
-                    'command' => $upCommand,
-                    'output' => $errorOutput,
-                    'returnCode' => $returnCode
-                ]);
-                throw new Exception("Failed to start Docker container. Error: {$errorOutput}");
-            }
-            Log::info("Docker container started successfully");
+    private function runPostInstallationCommands(string $alias): void
+    {
+        $commands = [
+            'composer install --no-interaction --optimize-autoloader',
+            'php artisan migrate --force',
+            'npm install',
+            'npm run build',
+            'chown -R www-data:www-data storage bootstrap/cache',
+            'chmod -R 775 storage bootstrap/cache'
+        ];
 
-            Log::info("Step 7: Waiting for services to be ready");
-            sleep(15);
+        foreach ($commands as $command) {
+            $this->executeCommand("docker exec {$alias}_app {$command}");
+            $this->dockerLogger->info("Successfully executed: {$command}");
+        }
+        
+        // Additional health check
+        $healthCheck = $this->executeCommand(
+            "docker exec {$alias}_app curl -I http://localhost",
+            [],
+            false
+        );
+        
+        if ($healthCheck['success']) {
+            $this->dockerLogger->info("Application health check passed");
+        } else {
+            $this->dockerLogger->warning("Application health check failed", [
+                'output' => $healthCheck['output']
+            ]);
+        }
+    }
 
-            Log::info("Step 8: Running migrations and setting permissions");
-            $commands = [
-                'composer install --no-interaction --optimize-autoloader',
-                'php artisan migrate --force',
-                'npm install',
-                'npm run build',
-                'chown -R www-data:www-data storage bootstrap/cache',
-                'chmod -R 775 storage bootstrap/cache'
-            ];
-
-            foreach ($commands as $command) {
-                $execCommand = "docker exec {$alias}_app {$command}";
-                exec($execCommand, $output, $returnCode);
-                if ($returnCode !== 0) {
-                    $errorOutput = implode("\n", $output);
-                    Log::error("Command failed: {$command}", [
-                        'output' => $errorOutput,
-                        'returnCode' => $returnCode
-                    ]);
-                    throw new Exception("Failed to execute command: {$command}. Error: {$errorOutput}");
-                }
-                Log::info("Successfully executed: {$command}");
-            }
-
-            Log::info("Provisioning completed successfully for alias: {$alias}");
-            return [
-                'success' => true,
-                'url' => "http://localhost:{$port}",
-                'alias' => $alias,
-                'port' => $port
-            ];
+    private function createRemoteDatabase(string $host, string $dbName, string $user, string $password): void
+    {
+        $dsn = "pgsql:host={$host};port=5432;dbname=postgres";
+        
+        try {
+            $this->dockerLogger->info("Attempting to connect to PostgreSQL server", ['host' => $host]);
+            
+            $pdo = new PDO($dsn, $user, $password, [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+                PDO::ATTR_TIMEOUT => 30
+            ]);
+            
+            $this->dockerLogger->info("Creating database", ['database' => $dbName]);
+            $pdo->exec("CREATE DATABASE \"{$dbName}\"");
 
         } catch (Exception $e) {
-            Log::error("Provisioning failed for alias: {$alias}", [
+            if (Str::contains($e->getMessage(), 'already exists')) {
+                $this->dockerLogger->info("Database already exists", ['database' => $dbName]);
+                return;
+            }
+            
+            $this->dockerLogger->error("Database creation failed", [
                 'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'host' => $host,
+                'database' => $dbName
             ]);
+            
             throw $e;
         }
     }
 
-    private function createRemoteDatabase($host, $dbName, $user, $password)
+    private function cleanupFailedProvision(string $alias, string $targetPath): void
     {
-        $dsn = "pgsql:host={$host};port=5432;dbname=postgres";
+        $this->dockerLogger->info("Attempting cleanup after failed provision", ['alias' => $alias]);
+        
         try {
-            Log::info("Attempting to connect to PostgreSQL server at {$host}");
-            $pdo = new PDO($dsn, $user, $password);
-            $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-
-            Log::info("Creating database: {$dbName}");
-            $pdo->exec("CREATE DATABASE \"{$dbName}\"");
-            Log::info("Database created successfully");
-
-        } catch (Exception $e) {
-            if (Str::contains($e->getMessage(), 'already exists')) {
-                Log::info("Database {$dbName} already exists, skipping.");
-            } else {
-                Log::error("Failed to create database", [
-                    'error' => $e->getMessage(),
-                    'host' => $host,
-                    'database' => $dbName
-                ]);
-                throw $e;
+            // Stop and remove container if it exists
+            $this->executeCommand(
+                "docker compose -f {$this->dockerDir}/docker-compose.{$alias}.yml down",
+                [],
+                false
+            );
+            
+            // Remove docker-compose file
+            if (File::exists("{$this->dockerDir}/docker-compose.{$alias}.yml")) {
+                File::delete("{$this->dockerDir}/docker-compose.{$alias}.yml");
             }
+            
+            // Remove instance directory if it exists
+            if (File::exists($targetPath)) {
+                File::deleteDirectory($targetPath);
+            }
+            
+            $this->dockerLogger->info("Cleanup completed", ['alias' => $alias]);
+        } catch (Exception $e) {
+            $this->dockerLogger->error("Cleanup failed", [
+                'alias' => $alias,
+                'error' => $e->getMessage()
+            ]);
         }
     }
 }
