@@ -311,7 +311,7 @@ CONF;
             $this->configureApache($alias, $targetPath);
 
             Log::info("Step 6: Running post-installation commands");
-            $this->runPostInstallationCommands($targetPath);
+            $this->runPostInstallationCommands($targetPath, $dbHost, $dbName, $dbUser, $dbPassword);
 
             Log::info("Step 7: Creating default users");
             $this->createDefaultUsers($targetPath, $alias, $managerEmail, $itEmail);
@@ -386,51 +386,84 @@ CONF;
         Log::info("Generated .env file for {$alias} with database configuration");
     }
 
-    private function runPostInstallationCommands(string $targetPath): void
+    private function runPostInstallationCommands(string $targetPath, string $dbHost, string $dbName, string $dbUser, string $dbPassword): void
     {
         Log::info("Starting post-installation commands", ['targetPath' => $targetPath]);
 
-        $commands = [
-            'composer install --no-interaction --optimize-autoloader',
-            'php artisan migrate:fresh --force --path=database/migrations',  // Specify migrations path
-            'php artisan db:seed',
-            //'npm install',
-            //'npm run build',
-            'chown -R www-data:www-data storage bootstrap/cache',
-            'chmod -R 775 storage bootstrap/cache'
-        ];
-
-        foreach ($commands as $command) {
-            Log::info("Executing command", [
-                'command' => $command,
-                'targetPath' => $targetPath
+        // Store original connection
+        $originalConnection = config('database.default');
+        
+        try {
+            // Switch to the new database connection
+            config([
+                'database.connections.pgsql' => [
+                    'driver' => 'pgsql',
+                    'host' => '22.32.230.155',
+                    'port' => '5432',
+                    'database' => $dbName,
+                    'username' => 'postgres',
+                    'password' => 'postgres',
+                ]
             ]);
+            
+            // Set as default connection
+            config(['database.default' => 'pgsql']);
+            
+            // Clear connection cache
+            DB::purge('pgsql');
+            DB::reconnect('pgsql');
 
-            // Change to target directory before running command
-            $currentDir = getcwd();
-            chdir($targetPath);
-            
-            exec($command, $output, $returnCode);
-            
-            // Change back to original directory
-            chdir($currentDir);
-            
-            Log::info("Command execution result", [
-                'command' => $command,
-                'output' => $output,
-                'returnCode' => $returnCode
-            ]);
+            $commands = [
+                'composer install --no-interaction --optimize-autoloader',
+                'php artisan migrate:fresh --force --path=database/migrations',  // Specify migrations path
+                'php artisan db:seed',
+                //'npm install',
+                //'npm run build',
+                'chown -R www-data:www-data storage bootstrap/cache',
+                'chmod -R 775 storage bootstrap/cache'
+            ];
 
-            if ($returnCode !== 0) {
-                $errorOutput = implode("\n", $output);
-                Log::error("Command failed", [
+            foreach ($commands as $command) {
+                Log::info("Executing command", [
                     'command' => $command,
-                    'output' => $errorOutput,
+                    'targetPath' => $targetPath
+                ]);
+
+                // Change to target directory before running command
+                $currentDir = getcwd();
+                chdir($targetPath);
+                
+                exec($command, $output, $returnCode);
+                
+                // Change back to original directory
+                chdir($currentDir);
+                
+                Log::info("Command execution result", [
+                    'command' => $command,
+                    'output' => $output,
                     'returnCode' => $returnCode
                 ]);
-                throw new Exception("Failed to execute command: {$command}. Error: {$errorOutput}");
+
+                if ($returnCode !== 0) {
+                    $errorOutput = implode("\n", $output);
+                    Log::error("Command failed", [
+                        'command' => $command,
+                        'output' => $errorOutput,
+                        'returnCode' => $returnCode
+                    ]);
+                    throw new Exception("Failed to execute command: {$command}. Error: {$errorOutput}");
+                }
+                Log::info("Successfully executed command", ['command' => $command]);
             }
-            Log::info("Successfully executed command", ['command' => $command]);
+        } finally {
+            // Reset to original connection
+            config(['database.default' => $originalConnection]);
+            DB::purge('pgsql');
+            DB::reconnect($originalConnection);
+            
+            Log::info("Database connection reset to original", [
+                'originalConnection' => $originalConnection
+            ]);
         }
     }
 
