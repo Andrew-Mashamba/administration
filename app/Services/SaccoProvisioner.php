@@ -150,7 +150,7 @@ class SaccoProvisioner
 
             if ($currentFile % 10 === 0) {
                 $progress = round(($currentFile / $totalFiles) * 100, 2);
-                Log::info("Copying files... {$progress}% complete");
+               // $this->dockerLogger->info("Copying files... {$progress}% complete");
             }
         }
 
@@ -270,9 +270,10 @@ class SaccoProvisioner
         $this->executeCommand("chmod 644 {$targetPath}/.env");
     }
 
-            Log::info("Step 4: Creating Dockerfile");
-            $dockerFilePath = "{$dockerDir}/Dockerfile";
-            $dockerfileContent = <<<DOCKERFILE
+    private function createDockerfile(string $alias, string $targetPath): void
+    {
+        $dockerfileContent = <<<DOCKERFILE
+# Use official PHP Apache image
 FROM php:8.2-apache
 
 # Set environment variables to prevent interactive prompts
@@ -376,11 +377,10 @@ DOCKERFILE;
         $this->executeCommand("chmod 644 {$dockerFilePath}");
     }
 
-            Log::info("Step 5: Creating docker-compose file");
-            $port = rand(8100, 8999);
-            $compose = <<<YML
-version: '3.8'
-
+    private function generateDockerComposeFile(string $alias, string $targetPath): int
+    {
+        $port = rand(8100, 8999);
+        $composeContent = <<<YML
 services:
   {$alias}_app:
     build:
@@ -402,41 +402,67 @@ networks:
     driver: bridge
 YML;
 
-            $composePath = "{$dockerDir}/docker-compose.{$alias}.yml";
-            File::put($composePath, $compose);
-            exec("chmod 644 {$composePath}");
-            Log::info("Docker compose file created at: {$composePath}");
+        $composePath = "{$this->dockerDir}/docker-compose.{$alias}.yml";
+        File::put($composePath, $composeContent);
+        $this->executeCommand("chmod 644 {$composePath}");
+        
+        return $port;
+    }
 
-            Log::info("Step 6: Starting Docker container");
-            putenv('COMPOSE_BAKE=true');
+    private function startDockerContainer(string $alias, int $port): void
+    {
+$composePath = "{$this->dockerDir}/docker-compose.{$alias}.yml";
+
+$buildResult = $this->executeCommand(
+    "docker compose -f {$composePath} build --no-cache",
+    [
+        'HOME' => '/tmp',
+        'COMPOSE_BAKE' => 'true'
+    ],
+    false
+);
+  
+        if (!$buildResult['success']) {
+            $this->dockerLogger->warning("Initial build failed, attempting with --no-cache", [
+                'error' => $buildResult['output']
+            ]);
             
-            // Execute the script with proper path
-            $upCommand = "cd {$baseDir} && docker compose -f {$composePath} up -d --build";
-            exec($upCommand, $output, $returnCode);
+            $this->executeCommand(
+                "docker compose -f {$composePath} build --no-cache",
+                ['COMPOSE_BAKE' => 'true']
+            );
+        }
+        
+        // Start the container
+        $this->executeCommand(
+            "docker compose -f {$composePath} up -d",
+            ['COMPOSE_BAKE' => 'true']
+        );
+        
+        // Verify container is running
+        $checkResult = $this->executeCommand(
+            "docker inspect --format='{{.State.Status}}' {$alias}_app",
+            [],
+            false
+        );
+        
+        if (!trim($checkResult['output']) === 'running') {
+            throw new Exception("Container failed to start. Status: {$checkResult['output']}");
+        }
+        
+        $this->dockerLogger->info("Container started successfully on port {$port}");
+    }
 
-            if ($returnCode !== 0) {
-                $errorOutput = implode("\n", $output);
-                Log::error("Docker command failed", [
-                    'command' => $upCommand,
-                    'output' => $errorOutput,
-                    'returnCode' => $returnCode
-                ]);
-                throw new Exception("Failed to start Docker container. Error: {$errorOutput}");
-            }
-            Log::info("Docker container started successfully");
-
-            Log::info("Step 7: Waiting for services to be ready");
-            sleep(15);
-
-            Log::info("Step 8: Running migrations and setting permissions");
-            $commands = [
-                'composer install --no-interaction --optimize-autoloader',
-                'php artisan migrate --force',
-                'npm install',
-                'npm run build',
-                'chown -R www-data:www-data storage bootstrap/cache',
-                'chmod -R 775 storage bootstrap/cache'
-            ];
+    private function runPostInstallationCommands(string $alias): void
+    {
+        $commands = [
+            'composer install --no-interaction --optimize-autoloader',
+            'php artisan migrate --force',
+            'npm install',
+            'npm run build',
+            'chown -R www-data:www-data storage bootstrap/cache',
+            'chmod -R 775 storage bootstrap/cache'
+        ];
 
         foreach ($commands as $command) {
             $this->executeCommand("docker exec {$alias}_app {$command}");
