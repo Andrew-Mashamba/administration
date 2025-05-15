@@ -1,4 +1,5 @@
 import './bootstrap';
+import ApexCharts from 'apexcharts'
 
 // resources/js/app.js
 
