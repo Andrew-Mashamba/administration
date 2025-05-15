@@ -388,9 +388,11 @@ CONF;
 
     private function runPostInstallationCommands(string $targetPath): void
     {
+        Log::info("Starting post-installation commands", ['targetPath' => $targetPath]);
+
         $commands = [
             'composer install --no-interaction --optimize-autoloader',
-            'php artisan migrate --force',
+            'php artisan migrate:fresh --force',  // Fresh migration
             'php artisan db:seed',
             'npm install',
             'npm run build',
@@ -399,16 +401,30 @@ CONF;
         ];
 
         foreach ($commands as $command) {
-            exec("cd {$targetPath} && {$command}", $output, $returnCode);
+            Log::info("Executing command", [
+                'command' => $command,
+                'targetPath' => $targetPath
+            ]);
+
+            $fullCommand = "cd {$targetPath} && {$command}";
+            exec($fullCommand, $output, $returnCode);
+            
+            Log::info("Command execution result", [
+                'command' => $fullCommand,
+                'output' => $output,
+                'returnCode' => $returnCode
+            ]);
+
             if ($returnCode !== 0) {
                 $errorOutput = implode("\n", $output);
-                Log::error("Command failed: {$command}", [
+                Log::error("Command failed", [
+                    'command' => $fullCommand,
                     'output' => $errorOutput,
                     'returnCode' => $returnCode
                 ]);
                 throw new Exception("Failed to execute command: {$command}. Error: {$errorOutput}");
             }
-            Log::info("Successfully executed: {$command}");
+            Log::info("Successfully executed command", ['command' => $fullCommand]);
         }
     }
 
