@@ -138,18 +138,20 @@ class SaccosManagement extends Component
 
             $this->isCreating = false;
 
-            try {
-                (new SaccoProvisioner())->provisionWithDocker(
-                    $this->alias,
-                    $this->db_name,
-                    $this->db_host,
-                    $this->db_user,
-                    $this->db_password
-                );
-                session()->flash('message', 'SACCO provisioned successfully via shared PostgreSQL!');
-            } catch (\Exception $e) {
-                session()->flash('error', 'Provisioning failed: ' . $e->getMessage());
-            }
+        try {
+            (new SaccoProvisioner())->provision(
+                $this->alias,
+                $this->db_name,
+                $this->db_host,
+                $this->db_user,
+                $this->db_password,
+                $this->manager_email,
+                $this->it_email
+            );
+            session()->flash('message', 'SACCO provisioned successfully via shared PostgreSQL!');
+        } catch (\Exception $e) {
+            session()->flash('error', 'Provisioning failed: ' . $e->getMessage());
+        }
 
             $this->reset([
                 'name', 'location', 'contact_person', 'phone', 'email',

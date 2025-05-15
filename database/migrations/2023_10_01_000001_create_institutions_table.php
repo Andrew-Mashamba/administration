@@ -26,7 +26,6 @@ return new class extends Migration {
             $table->string('it_email')->nullable();
             $table->string('it_phone_number')->nullable();
 
-            $table->softDeletes(); // enables soft deletes
             $table->timestamps();
         });
     }
