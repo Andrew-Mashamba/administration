@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use PDO;
 use Exception;
+use Jackiedo\DotenvEditor\DotenvEditor;
 
 
 class SaccoProvisioner
@@ -101,26 +102,23 @@ class SaccoProvisioner
 private function configureApache(string $alias, string $targetPath): void
 {
     $timestamp = now()->toDateTimeString();
-	$primaryDomain = "nbcsaccos.co.tz";
+    $primaryDomain = "nbcsaccos.co.tz";
+    $instanceDomain = "{$alias}.{$primaryDomain}";
 
     // Apache log paths
     $logDir = "/var/log/httpd";
-    $accessLog = "{$logDir}/{$primaryDomain}-access.log";
-    $errorLog = "{$logDir}/{$primaryDomain}-error.log";
+    $accessLog = "{$logDir}/{$alias}-access.log";
+    $errorLog = "{$logDir}/{$alias}-error.log";
 
     // Ensure log directory exists
     if (!is_dir($logDir)) {
         mkdir($logDir, 0755, true);
     }
 
-    // Alias line
-    $aliasLine = $alias ? "ServerAlias {$alias}" : '';
-
-    // Apache virtual host config (HTTP + HTTPS)
+    // Apache virtual host config (HTTP only)
     $vhostConfig = <<<CONF
 <VirtualHost *:80>
-    ServerName {$primaryDomain}
-    {$aliasLine}
+    ServerName {$instanceDomain}
     DocumentRoot "{$targetPath}/public"
 
     <Directory "{$targetPath}/public">
@@ -132,16 +130,15 @@ private function configureApache(string $alias, string $targetPath): void
     ErrorLog "{$errorLog}"
     CustomLog "{$accessLog}" combined
 </VirtualHost>
-
 CONF;
 
-    $vhostPath = "/etc/httpd/conf.d/{$primaryDomain}.conf";
+    $vhostPath = "/etc/httpd/conf.d/{$alias}.conf";
 
     try {
-        Log::info("[{$timestamp}] Writing Apache vhost for '{$primaryDomain}' to '{$vhostPath}'");
+        Log::info("[{$timestamp}] Writing Apache vhost for '{$instanceDomain}' to '{$vhostPath}'");
 
         // Write the config with elevated privileges
-        $tmpFile = sys_get_temp_dir() . "/vhost_{$primaryDomain}.conf";
+        $tmpFile = sys_get_temp_dir() . "/vhost_{$alias}.conf";
         file_put_contents($tmpFile, $vhostConfig);
 
         $cmd = escapeshellcmd("sudo mv {$tmpFile} {$vhostPath}");
@@ -149,7 +146,7 @@ CONF;
 
         if ($returnCode !== 0) {
             $error = implode("\n", $output);
-            Log::error("[{$timestamp}] Failed to move Apache config for '{$primaryDomain}': {$error}");
+            Log::error("[{$timestamp}] Failed to move Apache config for '{$instanceDomain}': {$error}");
             throw new Exception("Failed to install Apache virtual host configuration.");
         }
 
@@ -161,7 +158,7 @@ CONF;
             throw new Exception("Failed to reload Apache.");
         }
 
-        Log::info("[{$timestamp}] Apache configured and reloaded for '{$primaryDomain}' with alias '{$alias}'");
+        Log::info("[{$timestamp}] Apache configured and reloaded for '{$instanceDomain}'");
     } catch (Exception $e) {
         Log::error("[{$timestamp}] Apache configuration failed: " . $e->getMessage());
         throw $e;
@@ -233,17 +230,40 @@ CONF;
     private function sendWelcomeEmail(string $email, string $password, string $alias): void
     {
         $url = "{$this->baseUrl}/{$alias}";
+        $instanceDomain = "{$alias}.nbcsaccos.co.tz";
 
-        Mail::send('emails.welcome', [
-            'email' => $email,
-            'password' => $password,
-            'url' => $url
-        ], function($message) use ($email) {
-            $message->to($email)
-                   ->subject('Welcome to Your New SACCO Instance');
-        });
+        try {
+            Mail::to($email)
+                ->queue(new \App\Mail\WelcomeEmail([
+                    'email' => $email,
+                    'password' => $password,
+                    'url' => "http://{$instanceDomain}",
+                    'name' => explode('@', $email)[0] // Extract name from email
+                ]));
 
-        Log::info("Welcome email sent to {$email}");
+            Log::info("Welcome email queued for {$email}");
+        } catch (Exception $e) {
+            Log::error("Failed to queue welcome email", [
+                'email' => $email,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            // Store failed email in database for retry
+            DB::table('failed_emails')->insert([
+                'email' => $email,
+                'template' => 'emails.welcome',
+                'data' => json_encode([
+                    'email' => $email,
+                    'password' => $password,
+                    'url' => "https://{$instanceDomain}",
+                    'name' => explode('@', $email)[0]
+                ]),
+                'error' => $e->getMessage(),
+                'created_at' => now(),
+                'updated_at' => now()
+            ]);
+        }
     }
 
     public function provision(string $alias, string $dbName, string $dbHost, string $dbUser = 'postgres', string $dbPassword = 'postgres', ?string $managerEmail = null, ?string $itEmail = null): array
@@ -282,7 +302,7 @@ CONF;
             $this->createRemoteDatabase($dbHost, $dbName, $dbUser, $dbPassword);
 
             Log::info("Step 3: Generating .env file");
-            $this->generateEnvFile($targetPath, $dbName, $dbHost, $dbUser, $dbPassword);
+            $this->generateEnvFile($targetPath, $dbName, $dbHost, $dbUser, $dbPassword, $alias);
 
             Log::info("Step 4: Updating Livewire config");
             $this->updateLivewireConfig($targetPath, $alias);
@@ -324,35 +344,46 @@ CONF;
         }
     }
 
-    private function generateEnvFile(string $targetPath, string $dbName, string $dbHost, string $dbUser, string $dbPassword): void
+    private function generateEnvFile(string $targetPath, string $dbName, string $dbHost, string $dbUser, string $dbPassword, string $alias): void
     {
-        $envTemplatePath = "{$this->baseDir}/template/.env";
+        $envTemplatePath = "{$this->baseDir}/template/.env.stub";
         if (!File::exists($envTemplatePath)) {
-            throw new Exception("Template .env file not found at: {$envTemplatePath}");
+            throw new Exception("Template .env.stub file not found at: {$envTemplatePath}");
         }
 
-        $envContent = str_replace(
-            [
-                'DB_CONNECTION=mysql',
-                'DB_DATABASE=laravel',
-                'DB_USERNAME=root',
-                'DB_PASSWORD=',
-                'DB_HOST=127.0.0.1',
-                'DB_PORT=3306',
-            ],
-            [
-                'DB_CONNECTION=pgsql',
-                "DB_DATABASE={$dbName}",
-                "DB_USERNAME={$dbUser}",
-                "DB_PASSWORD={$dbPassword}",
-                "DB_HOST={$dbHost}",
-                'DB_PORT=5432',
-            ],
-            File::get($envTemplatePath)
-        );
+        // Copy template to target path
+        File::copy($envTemplatePath, "{$targetPath}/.env");
 
-        File::put("{$targetPath}/.env", $envContent);
+        // Initialize DotenvEditor with proper container and config
+        $editor = app(DotenvEditor::class, []);
+        $editor->load("{$targetPath}/.env");
+
+        // Set database configuration
+        $editor->setKeys([
+            'DB_CONNECTION' => 'pgsql',
+            'DB_HOST' => $dbHost,
+            'DB_PORT' => '5432',
+            'DB_DATABASE' => $dbName,
+            'DB_USERNAME' => $dbUser,
+            'DB_PASSWORD' => $dbPassword,
+        ]);
+
+        // Set application configuration
+        $editor->setKeys([
+            'APP_URL' => "http://{$alias}.nbcsaccos.co.tz",
+            'APP_ENV' => 'production',
+            'APP_DEBUG' => 'false',
+            'LOG_CHANNEL' => 'daily',
+            'LOG_LEVEL' => 'info',
+        ]);
+
+        // Save changes
+        $editor->save();
+
+        // Set proper permissions
         exec("chmod 644 {$targetPath}/.env");
+
+        Log::info("Generated .env file for {$alias} with database configuration");
     }
 
     private function runPostInstallationCommands(string $targetPath): void
