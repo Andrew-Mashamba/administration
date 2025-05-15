@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Mail;
 use PDO;
 use Exception;
 
+
 class SaccoProvisioner
 {
     private $baseDir;
@@ -95,11 +96,31 @@ class SaccoProvisioner
         Log::info("Updated Livewire config for {$alias}");
     }
 
-    private function configureApache(string $alias, string $targetPath): void
-    {
-        $vhostConfig = <<<CONF
+
+
+private function configureApache(string $alias, string $targetPath): void
+{
+    $timestamp = now()->toDateTimeString();
+	$primaryDomain = "nbcsaccos.co.tz";
+
+    // Apache log paths
+    $logDir = "/var/log/httpd";
+    $accessLog = "{$logDir}/{$primaryDomain}-access.log";
+    $errorLog = "{$logDir}/{$primaryDomain}-error.log";
+
+    // Ensure log directory exists
+    if (!is_dir($logDir)) {
+        mkdir($logDir, 0755, true);
+    }
+
+    // Alias line
+    $aliasLine = $alias ? "ServerAlias {$alias}" : '';
+
+    // Apache virtual host config (HTTP + HTTPS)
+    $vhostConfig = <<<CONF
 <VirtualHost *:80>
-    ServerName {$this->baseUrl}/{$alias}
+    ServerName {$primaryDomain}
+    {$aliasLine}
     DocumentRoot "{$targetPath}/public"
 
     <Directory "{$targetPath}/public">
@@ -108,26 +129,44 @@ class SaccoProvisioner
         Require all granted
     </Directory>
 
-    ErrorLog "logs/{$alias}-error.log"
-    CustomLog "logs/{$alias}-access.log" combined
+    ErrorLog "{$errorLog}"
+    CustomLog "{$accessLog}" combined
 </VirtualHost>
+
 CONF;
 
-        $vhostPath = "/etc/httpd/conf.d/{$alias}.conf";
-        exec("sudo tee {$vhostPath} << 'EOL'\n{$vhostConfig}\nEOL", $output, $returnCode);
+    $vhostPath = "/etc/httpd/conf.d/{$primaryDomain}.conf";
+
+    try {
+        Log::info("[{$timestamp}] Writing Apache vhost for '{$primaryDomain}' to '{$vhostPath}'");
+
+        // Write the config with elevated privileges
+        $tmpFile = sys_get_temp_dir() . "/vhost_{$primaryDomain}.conf";
+        file_put_contents($tmpFile, $vhostConfig);
+
+        $cmd = escapeshellcmd("sudo mv {$tmpFile} {$vhostPath}");
+        exec($cmd, $output, $returnCode);
 
         if ($returnCode !== 0) {
-            throw new Exception("Failed to create Apache virtual host configuration");
+            $error = implode("\n", $output);
+            Log::error("[{$timestamp}] Failed to move Apache config for '{$primaryDomain}': {$error}");
+            throw new Exception("Failed to install Apache virtual host configuration.");
         }
 
         // Reload Apache
-        exec("sudo systemctl reload httpd", $output, $returnCode);
-        if ($returnCode !== 0) {
-            throw new Exception("Failed to reload Apache");
+        exec("sudo systemctl reload httpd", $reloadOutput, $reloadCode);
+        if ($reloadCode !== 0) {
+            $error = implode("\n", $reloadOutput);
+            Log::error("[{$timestamp}] Apache reload failed: {$error}");
+            throw new Exception("Failed to reload Apache.");
         }
 
-        Log::info("Apache configured for {$alias}");
+        Log::info("[{$timestamp}] Apache configured and reloaded for '{$primaryDomain}' with alias '{$alias}'");
+    } catch (Exception $e) {
+        Log::error("[{$timestamp}] Apache configuration failed: " . $e->getMessage());
+        throw $e;
     }
+}
 
     private function createDefaultUsers(string $targetPath, string $alias, ?string $managerEmail = null, ?string $itEmail = null): void
     {
@@ -226,7 +265,7 @@ CONF;
                 'host' => $dbHost
             ]);
 
-            $baseTemplate = "{$this->baseDir}/template_v3";
+            $baseTemplate = "{$this->baseDir}/template";
             $targetPath = "{$this->instancesDir}/{$alias}";
 
             // Ensure proper permissions
@@ -287,7 +326,7 @@ CONF;
 
     private function generateEnvFile(string $targetPath, string $dbName, string $dbHost, string $dbUser, string $dbPassword): void
     {
-        $envTemplatePath = "{$this->baseDir}/template_v3/.env";
+        $envTemplatePath = "{$this->baseDir}/template/.env";
         if (!File::exists($envTemplatePath)) {
             throw new Exception("Template .env file not found at: {$envTemplatePath}");
         }
