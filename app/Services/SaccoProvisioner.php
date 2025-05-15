@@ -394,8 +394,8 @@ CONF;
             'composer install --no-interaction --optimize-autoloader',
             'php artisan migrate:fresh --force',  // Fresh migration
             'php artisan db:seed',
-            'npm install',
-            'npm run build',
+            //'npm install',
+            //'npm run build',
             'chown -R www-data:www-data storage bootstrap/cache',
             'chmod -R 775 storage bootstrap/cache'
         ];
