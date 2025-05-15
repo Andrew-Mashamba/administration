@@ -20,5 +20,9 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         //
+
+	\Livewire\Livewire::setUpdateRoute(function ($handle) {
+    return \Illuminate\Support\Facades\Route::post('/administration/public/livewire/update', $handle);
+});
     }
 }

@@ -150,7 +150,7 @@ class SaccoProvisioner
 
             if ($currentFile % 10 === 0) {
                 $progress = round(($currentFile / $totalFiles) * 100, 2);
-                $this->dockerLogger->info("Copying files... {$progress}% complete");
+                Log::info("Copying files... {$progress}% complete");
             }
         }
 
@@ -270,60 +270,104 @@ class SaccoProvisioner
         $this->executeCommand("chmod 644 {$targetPath}/.env");
     }
 
-    private function createDockerfile(string $alias, string $targetPath): void
-    {
-        $dockerfileContent = <<<DOCKERFILE
+            Log::info("Step 4: Creating Dockerfile");
+            $dockerFilePath = "{$dockerDir}/Dockerfile";
+            $dockerfileContent = <<<DOCKERFILE
 FROM php:8.2-apache
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \\
-    git \\
-    curl \\
-    libpng-dev \\
-    libonig-dev \\
-    libxml2-dev \\
-    zip \\
-    unzip \\
-    libpq-dev \\
-    libzip-dev \\
-    libjpeg62-turbo-dev \\
-    libfreetype6-dev \\
-    nodejs \\
-    npm \\
-    && rm -rf /var/lib/apt/lists/*
+# Set environment variables to prevent interactive prompts
+ENV DEBIAN_FRONTEND=noninteractive
 
-# Install PHP extensions
-RUN docker-php-ext-configure gd --with-freetype --with-jpeg \\
-    && docker-php-ext-install -j$(nproc) pdo pdo_pgsql pgsql gd mbstring zip exif pcntl bcmath
+# Install system dependencies with cleanup in single RUN layer to reduce image size
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    curl \
+    libpng-dev \
+    libonig-dev \
+    libxml2-dev \
+    zip \
+    unzip \
+    libpq-dev \
+    libzip-dev \
+    libjpeg62-turbo-dev \
+    libfreetype6-dev \
+    libbz2-dev \
+    libxslt-dev \
+    && curl -fsSL https://deb.nodesource.com/setup_18.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
-# Install Composer
-RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+# Install PHP extensions with error checking
+RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install -j$(nproc) \
+        bz2 \
+        curl \
+        fileinfo \
+        gd \
+        gettext \
+        mbstring \
+        exif \
+        mysqli \
+        pdo \
+        pdo_mysql \
+        pdo_pgsql \
+        pdo_sqlite \
+        pgsql \
+        xsl \
+        zip \
+        pcntl \
+        bcmath \
+    && docker-php-source delete
 
-# Enable Apache mod_rewrite
-RUN a2enmod rewrite
+# Install Imagick with cleanup
+RUN apt-get update && apt-get install -y --no-install-recommends libmagickwand-dev \
+    && pecl install imagick \
+    && docker-php-ext-enable imagick \
+    && apt-get remove -y libmagickwand-dev \
+    && apt-get autoremove -y \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+# Install Composer with verification
+RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer --version=2.5.8 \
+    && chmod +x /usr/local/bin/composer \
+    && composer --version
+
+# Enable Apache modules and configure
+RUN a2enmod rewrite headers \
+    && echo "ServerName localhost" >> /etc/apache2/apache2.conf
 
 # Set working directory
 WORKDIR /var/www/html
 
-# Copy existing application directory contents
-COPY . /var/www/html
+# Copy application files with proper ownership
+COPY --chown=www-data:www-data . .
 
-# Install dependencies
-RUN composer install --no-interaction --optimize-autoloader --no-dev
+# Install PHP dependencies with error checking
+RUN composer install --no-interaction --optimize-autoloader --no-dev --no-progress --no-scripts \
+    || (echo "Composer install failed" && exit 1)
 
-# Set permissions
-RUN chown -R www-data:www-data /var/www/html/storage \\
-    && chown -R www-data:www-data /var/www/html/bootstrap/cache \\
-    && chmod -R 775 /var/www/html/storage \\
-    && chmod -R 775 /var/www/html/bootstrap/cache
+# Set permissions (simplified using find)
+RUN find /var/www/html/storage -type d -exec chmod 775 {} \; \
+    && find /var/www/html/storage -type f -exec chmod 664 {} \; \
+    && find /var/www/html/bootstrap/cache -type d -exec chmod 775 {} \; \
+    && find /var/www/html/bootstrap/cache -type f -exec chmod 664 {} \; \
+    && chown -R www-data:www-data /var/www/html
 
-# Build frontend assets
-RUN npm install && npm run build
+# Install and build frontend assets with error checking
+RUN if [ -f package.json ]; then \
+        npm install --no-audit --no-fund \
+        && npm run build --if-present \
+        && npm cache clean --force; \
+    fi
 
-# Expose port 80
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s \
+    CMD curl -f http://localhost/ || exit 1
+
 EXPOSE 80
 
-# Start Apache
 CMD ["apache2-foreground"]
 DOCKERFILE;
 
@@ -332,10 +376,9 @@ DOCKERFILE;
         $this->executeCommand("chmod 644 {$dockerFilePath}");
     }
 
-    private function generateDockerComposeFile(string $alias, string $targetPath): int
-    {
-        $port = rand(8100, 8999);
-        $composeContent = <<<YML
+            Log::info("Step 5: Creating docker-compose file");
+            $port = rand(8100, 8999);
+            $compose = <<<YML
 version: '3.8'
 
 services:
@@ -359,65 +402,41 @@ networks:
     driver: bridge
 YML;
 
-        $composePath = "{$this->dockerDir}/docker-compose.{$alias}.yml";
-        File::put($composePath, $composeContent);
-        $this->executeCommand("chmod 644 {$composePath}");
-        
-        return $port;
-    }
+            $composePath = "{$dockerDir}/docker-compose.{$alias}.yml";
+            File::put($composePath, $compose);
+            exec("chmod 644 {$composePath}");
+            Log::info("Docker compose file created at: {$composePath}");
 
-    private function startDockerContainer(string $alias, int $port): void
-    {
-        $composePath = "{$this->dockerDir}/docker-compose.{$alias}.yml";
-        
-        // First try a clean build
-        $buildResult = $this->executeCommand(
-            "docker compose -f {$composePath} build",
-            ['COMPOSE_BAKE' => 'true'],
-            false
-        );
-        
-        if (!$buildResult['success']) {
-            $this->dockerLogger->warning("Initial build failed, attempting with --no-cache", [
-                'error' => $buildResult['output']
-            ]);
+            Log::info("Step 6: Starting Docker container");
+            putenv('COMPOSE_BAKE=true');
             
-            $this->executeCommand(
-                "docker compose -f {$composePath} build --no-cache",
-                ['COMPOSE_BAKE' => 'true']
-            );
-        }
-        
-        // Start the container
-        $this->executeCommand(
-            "docker compose -f {$composePath} up -d",
-            ['COMPOSE_BAKE' => 'true']
-        );
-        
-        // Verify container is running
-        $checkResult = $this->executeCommand(
-            "docker inspect --format='{{.State.Status}}' {$alias}_app",
-            [],
-            false
-        );
-        
-        if (!trim($checkResult['output']) === 'running') {
-            throw new Exception("Container failed to start. Status: {$checkResult['output']}");
-        }
-        
-        $this->dockerLogger->info("Container started successfully on port {$port}");
-    }
+            // Execute the script with proper path
+            $upCommand = "cd {$baseDir} && docker compose -f {$composePath} up -d --build";
+            exec($upCommand, $output, $returnCode);
 
-    private function runPostInstallationCommands(string $alias): void
-    {
-        $commands = [
-            'composer install --no-interaction --optimize-autoloader',
-            'php artisan migrate --force',
-            'npm install',
-            'npm run build',
-            'chown -R www-data:www-data storage bootstrap/cache',
-            'chmod -R 775 storage bootstrap/cache'
-        ];
+            if ($returnCode !== 0) {
+                $errorOutput = implode("\n", $output);
+                Log::error("Docker command failed", [
+                    'command' => $upCommand,
+                    'output' => $errorOutput,
+                    'returnCode' => $returnCode
+                ]);
+                throw new Exception("Failed to start Docker container. Error: {$errorOutput}");
+            }
+            Log::info("Docker container started successfully");
+
+            Log::info("Step 7: Waiting for services to be ready");
+            sleep(15);
+
+            Log::info("Step 8: Running migrations and setting permissions");
+            $commands = [
+                'composer install --no-interaction --optimize-autoloader',
+                'php artisan migrate --force',
+                'npm install',
+                'npm run build',
+                'chown -R www-data:www-data storage bootstrap/cache',
+                'chmod -R 775 storage bootstrap/cache'
+            ];
 
         foreach ($commands as $command) {
             $this->executeCommand("docker exec {$alias}_app {$command}");
