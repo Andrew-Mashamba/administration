@@ -5,7 +5,9 @@
             <div class="bg-white overflow-hidden shadow-xl sm:rounded-lg p-6">
                 <h2 class="text-2xl font-bold mb-4">Users Management</h2>
                 <p class="text-gray-600">Manage your system users here.</p>
-            </div>
+                <livewire:user-table />
+                <livewire:edit-user-modal />
+            </div>            
         </div>
     </div>
 </div>
