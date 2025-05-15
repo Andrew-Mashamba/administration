@@ -113,12 +113,14 @@ class SaccosManagement extends Component
         $this->isCreating = false;
 
         try {
-            (new SaccoProvisioner())->provisionWithDocker(
+            (new SaccoProvisioner())->provision(
                 $this->alias,
                 $this->db_name,
                 $this->db_host,
                 $this->db_user,
-                $this->db_password
+                $this->db_password,
+                $this->manager_email,
+                $this->it_email
             );
             session()->flash('message', 'SACCO provisioned successfully via shared PostgreSQL!');
         } catch (\Exception $e) {
