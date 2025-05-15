@@ -22,26 +22,36 @@
     <body class="font-sans antialiased">
         <x-banner />
 
-        <div class="min-h-screen bg-gray-100">
-            @livewire('navigation-menu')
+        <div class="min-h-screen bg-gray-50">
+            <!-- Top Navigation -->
+            <livewire:navigation-menu class="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200"/>
 
-            <!-- Page Heading -->
-            @if (isset($header))
-                <header class="bg-white shadow">
-                    <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-                        {{ $header }}
-                    </div>
-                </header>
-            @endif
+            <div class="flex min-h-screen"> <!-- Reduced top padding -->
+                <!-- Sidebar -->
+                <livewire:side-bar class="fixed left-0 top-14 bottom-0 w-56 bg-white border-r border-gray-200 shadow-sm"/>
 
-            <!-- Page Content -->
-            <main>
-                {{ $slot }}
-            </main>
+                <!-- Main Content -->
+                <div class="flex-1 ml-2"> <!-- Adjusted margin to match new sidebar width -->                  
+                    <!-- Page Heading -->
+                    @if (isset($header))
+                        <header class="bg-white border-b border-gray-200">
+                            <div class="max-w-7xl mx-auto py-3 px-4 sm:px-6 lg:px-8"> <!-- Reduced vertical padding -->
+                                {{ $header }}
+                            </div>
+                        </header>
+                    @endif
+
+                    <!-- Page Content -->
+                    <main class="p-4 sm:p-6"> <!-- Adjusted padding -->
+                        <div class="max-w-7xl mx-auto">
+                            {{ $slot }}
+                        </div>
+                    </main>
+                </div>
+            </div>
         </div>
 
         @stack('modals')
-
         @livewireScripts
     </body>
 </html>

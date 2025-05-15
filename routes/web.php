@@ -1,14 +1,14 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Livewire\System;
 
 // Route::get('/', function () {
 //     return view('welcome');
 // });
 
 Route::get('/', function () {
-
-    return redirect('/system');
+    return redirect('/login');
 });
 
 Route::middleware([
@@ -16,11 +16,8 @@ Route::middleware([
     config('jetstream.auth_session'),
     'verified',
 ])->group(function () {
-    Route::get('/dashboard', function () {
-        return view('dashboard');
-    })->name('dashboard');
+   
+//   Route::get('/system', System::class)->name('system');
 });
+Route::get('/system', System::class)->name('system');
 
-Route::get('/system', function () {
-    return view('system');
-});
