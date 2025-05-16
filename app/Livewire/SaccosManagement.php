@@ -34,6 +34,9 @@ class SaccosManagement extends Component
     public $db_password;
     public $institution_id;
 
+    public $institution_type;
+    public $status;
+
     // Manager Information
     public $manager_email;
     public $manager_phone_number;
@@ -70,6 +73,9 @@ class SaccosManagement extends Component
         'phone' => 'nullable|string',
         'email' => 'nullable|email',
 
+        'institution_type' => 'required|string',
+        // 'status' => 'required|string',
+
         'alias' => 'required|string|unique:institutions,alias,' . ($this->editingId),
         'db_name' => 'required|string|unique:institutions,db_name,' . ($this->editingId),
         // 'db_host' => 'required|string',
@@ -89,7 +95,8 @@ class SaccosManagement extends Component
             $this->db_name = 'db_' . str_replace('-', '_', $this->alias);
             $this->db_host = env('DB_HOST', '127.0.0.1');
             $this->db_user = env('DB_USERNAME');
-            $this->db_password = env('DB_PASSWORD');
+            $this->db_password = env('DB_PASSWORD');            
+            $this->status = 'active';
         }
     }
 
@@ -107,6 +114,7 @@ class SaccosManagement extends Component
         $this->isEditing = false;
         $this->reset([
             'name', 'location', 'contact_person', 'phone', 'email',
+            'institution_type', 'status',
             'alias', 'db_name', 'db_host', 'db_user', 'db_password', 'institution_id',
             'manager_email', 'manager_phone_number', 'it_email', 'it_phone_number'
         ]);
@@ -134,6 +142,8 @@ class SaccosManagement extends Component
                 'manager_phone_number' => $this->manager_phone_number,
                 'it_email' => $this->it_email,
                 'it_phone_number' => $this->it_phone_number,
+                'institution_type' => $this->institution_type,
+                'status' => $this->status,
             ]);
 
             $this->isCreating = false;
@@ -155,6 +165,7 @@ class SaccosManagement extends Component
 
             $this->reset([
                 'name', 'location', 'contact_person', 'phone', 'email',
+                'institution_type', 'status',
                 'alias', 'db_name', 'db_host', 'db_user', 'db_password', 'institution_id',
                 'manager_email', 'manager_phone_number', 'it_email', 'it_phone_number'
             ]);
@@ -174,6 +185,17 @@ class SaccosManagement extends Component
         session()->flash('message', 'Institution soft deleted successfully.');
     }
 
+    public function toggleStatus($id)
+    {
+        $this->status = $this->status === 'active' ? 'inactive' : 'active';
+        
+        if ($id) {
+            $saccos = Institution::findOrFail($id);
+            $saccos->status = $this->status;
+            $saccos->save();
+        }
+    }
+
     public function editSaccos($id)
     {
         $saccos = Institution::findOrFail($id);
@@ -190,6 +212,8 @@ class SaccosManagement extends Component
         $this->email = $saccos->email;
         $this->alias = $saccos->alias;
         $this->db_name = $saccos->db_name;
+        $this->institution_type = $saccos->institution_type;
+        // $this->status = $saccos->status;
         // $this->db_host = $saccos->db_host;
         $this->db_user = $saccos->db_user;
         $this->db_password = $saccos->db_password;
@@ -224,6 +248,8 @@ class SaccosManagement extends Component
                 'manager_phone_number' => $this->manager_phone_number,
                 'it_email' => $this->it_email,
                 'it_phone_number' => $this->it_phone_number,
+                'institution_type' => $this->institution_type,
+                // 'status' => $this->status,
             ]);
 
             $this->isEditing = false;
@@ -234,7 +260,8 @@ class SaccosManagement extends Component
             $this->reset([
                 'name', 'location', 'contact_person', 'phone', 'email',
                 'alias', 'db_name', 'db_user', 'db_password', 'institution_id',
-                'manager_email', 'manager_phone_number', 'it_email', 'it_phone_number'
+                'manager_email', 'manager_phone_number', 'it_email', 'it_phone_number',
+                'institution_type', // 'status',
             ]);
 
             session()->flash('message', 'Institution updated successfully.');
@@ -252,7 +279,8 @@ class SaccosManagement extends Component
         $this->reset([
             'name', 'location', 'contact_person', 'phone', 'email',
             'alias', 'db_name', 'db_user', 'db_password', 'institution_id',
-            'manager_email', 'manager_phone_number', 'it_email', 'it_phone_number'
+            'manager_email', 'manager_phone_number', 'it_email', 'it_phone_number',
+            'institution_type', // 'status',
         ]);
     }
 
@@ -262,7 +290,8 @@ class SaccosManagement extends Component
         $this->reset([
             'name', 'location', 'contact_person', 'phone', 'email',
             'alias', 'db_name', 'db_host', 'db_user', 'db_password', 'institution_id',
-            'manager_email', 'manager_phone_number', 'it_email', 'it_phone_number'
+            'manager_email', 'manager_phone_number', 'it_email', 'it_phone_number',
+            'institution_type', // 'status',
         ]);
     }
 
