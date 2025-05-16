@@ -22,6 +22,9 @@
             @case(3)
                 <livewire:institutions.institution />
                 @break
+            @case(4)
+                <livewire:reports.dashboard />
+                @break
             @case(9)
                 <div class="p-4">
                     <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">

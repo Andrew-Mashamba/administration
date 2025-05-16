@@ -13,19 +13,22 @@ class MenuSeeder extends Seeder
      */
     public function run(): void
     {
-        $menus = [
-            [
-                'system_id' => 1,
-                'menu_name' => 'dashboard',
-                'menu_description' => 'Main dashboard overview',
-                'menu_title' => 'Dashboard',
+        // check if the menu already exists
+        $menu = Menu::where('menu_name', 'Dashboard')->first();
+        if (!$menu) {
+            $menus = [
+                [
+                    'system_id' => 1,
+                    'menu_name' => 'Dashboard',
+                    'menu_description' => 'Main dashboard overview',
+                    'menu_title' => 'Dashboard',
                 'menu_number' => 1,
                 'created_at' => now(),
                 'updated_at' => now(),
             ],
             [
                 'system_id' => 1,
-                'menu_name' => 'users',
+                'menu_name' => 'Users',
                 'menu_description' => 'User management section',
                 'menu_title' => 'Users',
                 'menu_number' => 3,
@@ -41,15 +44,15 @@ class MenuSeeder extends Seeder
                 'created_at' => now(),
                 'updated_at' => now(),
             ],
-            // [
-            //     'system_id' => 1,
-            //     'menu_name' => 'settings',
-            //     'menu_description' => 'System configuration settings',
-            //     'menu_title' => 'Settings',
-            //     'menu_number' => 4,
-            //     'created_at' => now(),
-            //     'updated_at' => now(),
-            // ],
+            [
+                'system_id' => 1,
+                'menu_name' => 'Reports',
+                'menu_description' => 'Reports and analytics',
+                'menu_title' => 'Reports',
+                'menu_number' => 4,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ],
             // [
             //     'system_id' => 1,
             //     'menu_name' => 'reports',
@@ -62,5 +65,6 @@ class MenuSeeder extends Seeder
         ];
 
         DB::table('menus')->insert($menus);
+        }
     }
 } 

@@ -193,6 +193,7 @@ class SaccosManagement extends Component
             $saccos = Institution::findOrFail($id);
             $saccos->status = $this->status;
             $saccos->save();
+            session()->flash('message', 'Institution status updated successfully.');
         }
     }
 

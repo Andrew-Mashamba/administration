@@ -15,7 +15,7 @@
         <!-- Scripts -->
         @vite(['resources/css/app.css', 'resources/js/app.js'])
 
-        <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+        {{--<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>--}}
 
         <!-- Styles -->
         @livewireStyles
@@ -24,32 +24,35 @@
         <x-banner />
 
         <div class="min-h-screen bg-gray-50">
-            <!-- Top Navigation -->
-            <livewire:navigation-menu class="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200"/>
-
-            <div class="flex min-h-screen"> <!-- Reduced top padding -->
+            <!-- Top Navigation -->            
+            <div class="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 h-14">
+                <livewire:navigation-menu />
+            </div>
+            
+            <div class="flex min-h-screen pt-14"> <!-- Add padding-top equal to navbar height -->
                 <!-- Sidebar -->
-                <livewire:side-bar class="fixed left-0 top-14 bottom-0 w-56 bg-white border-r border-gray-200 shadow-sm"/>
-
+                <div class="fixed left-0 top-14 bottom-0 w-56 bg-white border-r border-gray-200 shadow-sm">
+                    <livewire:side-bar />
+                </div>
+            
                 <!-- Main Content -->
-                <div class="flex-1 ml-2"> <!-- Adjusted margin to match new sidebar width -->                  
-                    <!-- Page Heading -->
+                <div class="flex-1 ml-56">
                     @if (isset($header))
                         <header class="bg-white border-b border-gray-200">
-                            <div class="max-w-7xl mx-auto py-3 px-4 sm:px-6 lg:px-8"> <!-- Reduced vertical padding -->
+                            <div class="max-w-7xl mx-auto py-3 px-4 sm:px-6 lg:px-8">
                                 {{ $header }}
                             </div>
                         </header>
                     @endif
-
-                    <!-- Page Content -->
-                    <main class="p-4 sm:p-6"> <!-- Adjusted padding -->
-                        <div class="max-w-7xl mx-auto">
+            
+                    <main class="p-4 sm:p-6">
+                        <div class="flex-1 max-w-7xl mx-auto">
                             {{ $slot }}
                         </div>
                     </main>
                 </div>
             </div>
+            
         </div>
 
         @stack('modals')
