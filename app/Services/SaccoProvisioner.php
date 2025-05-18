@@ -241,7 +241,7 @@ private function configureApache(string $alias, string $targetPath): void
             }
 
             Log::info("Step 1: Cloning template");
-            $this->copyDirectoryWithProgress($baseTemplate, $targetPath);
+            //$this->copyDirectoryWithProgress($baseTemplate, $targetPath);
 
             Log::info("Step 2: Creating database");
             $this->createRemoteDatabase($dbHost, $dbName, $dbUser, $dbPassword);

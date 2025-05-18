@@ -93,12 +93,17 @@ BASH;
 
     private function executeConfigScript(string $alias, string $targetPath): void
     {
-        $cmd = "sudo {$this->scriptPath} {$alias} {$targetPath}";
+
+        $aliasEscaped = escapeshellarg($alias);
+        $targetPathEscaped = escapeshellarg($targetPath);
+       // $cmd = "sudo /usr/local/bin/manage-apache-config {$aliasEscaped} {$targetPathEscaped}";
+        $cmd = "sudo /usr/local/bin/manage-apache-config {$aliasEscaped} {$targetPathEscaped} 2>&1";
         exec($cmd, $output, $returnCode);
 
         if ($returnCode !== 0) {
-            $error = implode("\n", $output);
-            throw new Exception("Failed to execute Apache configuration script: {$error}");
+            $errorOutput = implode("\n", $output);
+            Log::error("Apache config script failed:\nCommand: {$cmd}\nError:\n{$errorOutput}");
+            throw new Exception("Apache config failed: {$errorOutput}");
         }
     }
 
