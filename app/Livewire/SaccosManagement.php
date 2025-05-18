@@ -60,25 +60,25 @@ class SaccosManagement extends Component
     //     'it_phone_number' => 'nullable|string',
     // ];
 
-    
+
     public function rules()
     {
         return [
-        'name' => 'required|min:3',
-        'location' => 'nullable|string',
-        'contact_person' => 'nullable|string',
-        'phone' => 'nullable|string',
-        'email' => 'nullable|email',
+            'name' => 'required|min:3',
+            'location' => 'nullable|string',
+            'contact_person' => 'nullable|string',
+            'phone' => 'nullable|string',
+            'email' => 'nullable|email',
 
-        'alias' => 'required|string|unique:institutions,alias,' . ($this->editingId),
-        'db_name' => 'required|string|unique:institutions,db_name,' . ($this->editingId),
-        // 'db_host' => 'required|string',
-        'institution_id' => 'required|string|unique:institutions,institution_id,' . ($this->editingId),
+            'alias' => ['required', 'string', 'unique:institutions,alias' . ($this->editingId ? ",{$this->editingId}" : '')],
+            'db_name' => ['required', 'string', 'unique:institutions,db_name' . ($this->editingId ? ",{$this->editingId}" : '')],
+            'db_host' => 'required|string',
+            'institution_id' => ['required', 'string', 'unique:institutions,institution_id' . ($this->editingId ? ",{$this->editingId}" : '')],
 
-        'manager_email' => 'nullable|email',
-        'manager_phone_number' => 'nullable|string',
-        'it_email' => 'nullable|email',
-        'it_phone_number' => 'nullable|string',
+            'manager_email' => 'nullable|email',
+            'manager_phone_number' => 'nullable|string',
+            'it_email' => 'nullable|email',
+            'it_phone_number' => 'nullable|string',
         ];
     }
 
@@ -115,10 +115,10 @@ class SaccosManagement extends Component
     public function saveSaccos()
     {
         $this->isLoading = true;
-        // try {
+        try {
             $this->validate();
 
-            Institution::create([
+            $institution = Institution::create([
                 'name' => $this->name,
                 'location' => $this->location,
                 'contact_person' => $this->contact_person,
@@ -136,22 +136,22 @@ class SaccosManagement extends Component
                 'it_phone_number' => $this->it_phone_number,
             ]);
 
-            $this->isCreating = false;
-
-        try {
-            (new SaccoProvisioner())->provision(
-                $this->alias,
-                $this->db_name,
-                $this->db_host,
-                $this->db_user,
-                $this->db_password,
-                $this->manager_email,
-                $this->it_email
-            );
-            session()->flash('message', 'SACCO provisioned successfully via shared PostgreSQL!');
-        } catch (\Exception $e) {
-            session()->flash('error', 'Provisioning failed: ' . $e->getMessage());
-        }
+            try {
+                (new SaccoProvisioner())->provision(
+                    $this->alias,
+                    $this->db_name,
+                    $this->db_host,
+                    $this->db_user,
+                    $this->db_password,
+                    $this->manager_email,
+                    $this->it_email
+                );
+                session()->flash('message', 'SACCO provisioned successfully via shared PostgreSQL!');
+            } catch (\Exception $e) {
+                // If provisioning fails, delete the institution record
+                $institution->delete();
+                throw $e;
+            }
 
             $this->reset([
                 'name', 'location', 'contact_person', 'phone', 'email',
@@ -159,12 +159,13 @@ class SaccosManagement extends Component
                 'manager_email', 'manager_phone_number', 'it_email', 'it_phone_number'
             ]);
 
+            $this->isCreating = false;
             session()->flash('message', 'Institution created successfully.');
-        // } catch (\Exception $e) {
-        //     session()->flash('error', 'Error creating institution: ' . $e->getMessage());
-        // } finally {
+        } catch (\Exception $e) {
+            session()->flash('error', 'Error creating institution: ' . $e->getMessage());
+        } finally {
             $this->isLoading = false;
-        // }
+        }
     }
 
     public function softDeleteSaccos($id)
