@@ -9,6 +9,9 @@ use App\Livewire\ProvisioningStatusList;
 // });
 
 Route::get('/', function () {
+    if (auth()->check()) {
+        return redirect()->route('system');
+    }
     return redirect('/login');
 });
 
