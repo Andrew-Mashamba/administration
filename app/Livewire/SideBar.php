@@ -30,7 +30,7 @@ class SideBar extends Component
 
     public function menuItemClicked($item)
     {
-        // dd($item);
+        dd($item);
         $this->tab_id = $item;        
         $this->dispatch('menuItem', $item);
     }
