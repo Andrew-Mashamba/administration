@@ -101,66 +101,11 @@ class SaccoProvisioner
 
 private function configureApache(string $alias, string $targetPath): void
 {
-    $timestamp = now()->toDateTimeString();
-    $primaryDomain = "nbcsaccos.co.tz";
-    $instanceDomain = "{$alias}.{$primaryDomain}";
-
-    // Apache log paths
-    $logDir = "/var/log/httpd";
-    $accessLog = "{$logDir}/{$alias}-access.log";
-    $errorLog = "{$logDir}/{$alias}-error.log";
-
-    // Ensure log directory exists
-    if (!is_dir($logDir)) {
-        mkdir($logDir, 0755, true);
-    }
-
-    // Apache virtual host config (HTTP only)
-    $vhostConfig = <<<CONF
-<VirtualHost *:80>
-    ServerName {$instanceDomain}
-    DocumentRoot "{$targetPath}/public"
-
-    <Directory "{$targetPath}/public">
-        Options Indexes FollowSymLinks
-        AllowOverride All
-        Require all granted
-    </Directory>
-
-    ErrorLog "{$errorLog}"
-    CustomLog "{$accessLog}" combined
-</VirtualHost>
-CONF;
-
-    $vhostPath = "/etc/httpd/conf.d/{$alias}.conf";
-
     try {
-        Log::info("[{$timestamp}] Writing Apache vhost for '{$instanceDomain}' to '{$vhostPath}'");
-
-        // Write the config with elevated privileges
-        $tmpFile = sys_get_temp_dir() . "/vhost_{$alias}.conf";
-        file_put_contents($tmpFile, $vhostConfig);
-
-        $cmd = escapeshellcmd("sudo mv {$tmpFile} {$vhostPath}");
-        exec($cmd, $output, $returnCode);
-
-        if ($returnCode !== 0) {
-            $error = implode("\n", $output);
-            Log::error("[{$timestamp}] Failed to move Apache config for '{$instanceDomain}': {$error}");
-            throw new Exception("Failed to install Apache virtual host configuration.");
-        }
-
-        // Reload Apache
-        exec("sudo systemctl reload httpd", $reloadOutput, $reloadCode);
-        if ($reloadCode !== 0) {
-            $error = implode("\n", $reloadOutput);
-            Log::error("[{$timestamp}] Apache reload failed: {$error}");
-            throw new Exception("Failed to reload Apache.");
-        }
-
-        Log::info("[{$timestamp}] Apache configured and reloaded for '{$instanceDomain}'");
+        $apacheService = new ApacheConfigService();
+        $apacheService->configure($alias, $targetPath);
     } catch (Exception $e) {
-        Log::error("[{$timestamp}] Apache configuration failed: " . $e->getMessage());
+        Log::error("Apache configuration failed: " . $e->getMessage());
         throw $e;
     }
 }
@@ -537,6 +482,10 @@ CONF;
         Log::info("Attempting cleanup after failed provision", ['alias' => $alias]);
 
         try {
+            // Remove Apache configuration
+            $apacheService = new ApacheConfigService();
+            $apacheService->removeConfig($alias);
+
             // Remove instance directory if it exists
             if (File::exists($targetPath)) {
                 File::deleteDirectory($targetPath);
