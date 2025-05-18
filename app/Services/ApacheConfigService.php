@@ -17,7 +17,7 @@ class ApacheConfigService
     {
         $this->configDir = '/etc/httpd/conf.d';
         $this->logDir = '/var/log/httpd';
-        $this->scriptPath = '/usr/local/bin/manage-apache-config';
+        $this->scriptPath = storage_path('app/apache-config/manage-apache-config.sh');
     }
 
     public function configure(string $alias, string $targetPath): void
@@ -28,9 +28,6 @@ class ApacheConfigService
         try {
             // Ensure log directory exists
             $this->ensureLogDirectory();
-
-            // Create and execute the configuration script
-            $this->createConfigScript($alias, $targetPath);
 
             // Execute the script with sudo
             $this->executeConfigScript($alias, $targetPath);
@@ -49,48 +46,6 @@ class ApacheConfigService
                 throw new Exception("Failed to create log directory: {$this->logDir}");
             }
         }
-    }
-
-    private function createConfigScript(string $alias, string $targetPath): void
-    {
-        $scriptContent = <<<BASH
-#!/bin/bash
-
-# Check if running as root
-if [ "\$EUID" -ne 0 ]; then
-    echo "Please run as root"
-    exit 1
-fi
-
-# Create Apache config
-cat > {$this->configDir}/{$alias}.conf << EOF
-<VirtualHost *:80>
-    ServerName {$alias}.nbcsaccos.co.tz
-    DocumentRoot "{$targetPath}/public"
-
-    <Directory "{$targetPath}/public">
-        Options Indexes FollowSymLinks
-        AllowOverride All
-        Require all granted
-    </Directory>
-
-    ErrorLog "/var/log/httpd/{$alias}-error.log"
-    CustomLog "/var/log/httpd/{$alias}-access.log" combined
-</VirtualHost>
-EOF
-
-# Set permissions
-chmod 644 {$this->configDir}/{$alias}.conf
-
-# Reload Apache
-systemctl reload httpd
-BASH;
-
-        if (!file_put_contents($this->scriptPath, $scriptContent)) {
-            throw new Exception("Failed to create Apache configuration script");
-        }
-
-        chmod($this->scriptPath, 0755);
     }
 
     private function executeConfigScript(string $alias, string $targetPath): void
