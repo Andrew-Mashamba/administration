@@ -18,6 +18,6 @@ Route::middleware([
     'verified',
 ])->group(function () {
     Route::get('/system', System::class)->name('system');
-    Route::get('/provisioning-status', ProvisioningStatusList::class)->name('provisioning.status');
+    //Route::get('/provisioning-status', ProvisioningStatusList::class)->name('provisioning.status');
 });
 
