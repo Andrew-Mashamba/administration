@@ -7,6 +7,7 @@ use Illuminate\Support\Str;
 use Livewire\WithPagination;
 use Livewire\Component;
 use App\Services\SaccoProvisioner;
+use App\Jobs\ProvisionSaccoJob;
 
 class SaccosManagement extends Component
 {
@@ -114,57 +115,47 @@ class SaccosManagement extends Component
 
     public function saveSaccos()
     {
-        $this->isLoading = true;
+        $this->validate([
+            'saccos' => 'required|array',
+            'saccos.*.name' => 'required|string|max:255',
+            'saccos.*.alias' => 'required|string|max:255|regex:/^[a-z0-9-]+$/',
+            'saccos.*.db_name' => 'required|string|max:255|regex:/^[a-z0-9_]+$/',
+            'saccos.*.db_host' => 'required|string|max:255',
+            'saccos.*.db_user' => 'required|string|max:255',
+            'saccos.*.db_password' => 'required|string|max:255',
+            'saccos.*.manager_email' => 'nullable|email|max:255',
+            'saccos.*.it_email' => 'nullable|email|max:255',
+        ]);
+
         try {
-            $this->validate();
+            foreach ($this->saccos as $sacco) {
+                if (empty($sacco['name']) || empty($sacco['alias']) || empty($sacco['db_name']) ||
+                    empty($sacco['db_host']) || empty($sacco['db_user']) || empty($sacco['db_password'])) {
+                    continue;
+                }
 
-            $institution = Institution::create([
-                'name' => $this->name,
-                'location' => $this->location,
-                'contact_person' => $this->contact_person,
-                'phone' => $this->phone,
-                'email' => $this->email,
-                'alias' => $this->alias,
-                'db_name' => $this->db_name,
-                'db_host' => $this->db_host,
-                'db_user' => $this->db_user,
-                'db_password' => $this->db_password,
-                'institution_id' => $this->institution_id,
-                'manager_email' => $this->manager_email,
-                'manager_phone_number' => $this->manager_phone_number,
-                'it_email' => $this->it_email,
-                'it_phone_number' => $this->it_phone_number,
-            ]);
-
-            try {
-                (new SaccoProvisioner())->provision(
-                    $this->alias,
-                    $this->db_name,
-                    $this->db_host,
-                    $this->db_user,
-                    $this->db_password,
-                    $this->manager_email,
-                    $this->it_email
+                ProvisionSaccoJob::dispatch(
+                    $sacco['alias'],
+                    $sacco['db_name'],
+                    $sacco['db_host'],
+                    $sacco['db_user'],
+                    $sacco['db_password'],
+                    $sacco['manager_email'] ?? null,
+                    $sacco['it_email'] ?? null
                 );
-                session()->flash('message', 'SACCO provisioned successfully via shared PostgreSQL!');
-            } catch (\Exception $e) {
-                // If provisioning fails, delete the institution record
-                $institution->delete();
-                throw $e;
             }
 
-            $this->reset([
-                'name', 'location', 'contact_person', 'phone', 'email',
-                'alias', 'db_name', 'db_host', 'db_user', 'db_password', 'institution_id',
-                'manager_email', 'manager_phone_number', 'it_email', 'it_phone_number'
+            $this->dispatch('saccos-saved');
+            $this->dispatch('notify', [
+                'type' => 'success',
+                'message' => 'SACCOs have been queued for provisioning. You will be notified of the progress.'
             ]);
 
-            $this->isCreating = false;
-            session()->flash('message', 'Institution created successfully.');
         } catch (\Exception $e) {
-            session()->flash('error', 'Error creating institution: ' . $e->getMessage());
-        } finally {
-            $this->isLoading = false;
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => 'Failed to queue SACCOs for provisioning: ' . $e->getMessage()
+            ]);
         }
     }
 

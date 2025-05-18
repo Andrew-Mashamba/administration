@@ -19,11 +19,24 @@ class SaccoProvisioner
     private $baseDir;
     private $instancesDir;
     private $baseUrl = 'http://172.240.241.180';
+    private $progressCallback;
 
     public function __construct()
     {
         $this->baseDir = dirname(base_path());
         $this->instancesDir = "{$this->baseDir}/instances";
+    }
+
+    public function setProgressCallback(callable $callback)
+    {
+        $this->progressCallback = $callback;
+    }
+
+    private function notifyProgress($step, $message, $data = [])
+    {
+        if ($this->progressCallback) {
+            call_user_func($this->progressCallback, $step, $message, $data);
+        }
     }
 
     private function copyDirectoryWithProgress(string $source, string $destination): void
@@ -225,7 +238,7 @@ private function configureApache(string $alias, string $targetPath): void
             $alias = Str::slug($alias);
             $dbName = Str::slug($dbName, '_');
 
-            Log::info("Starting provisioning process", [
+            $this->notifyProgress('started', 'Starting provisioning process', [
                 'alias' => $alias,
                 'database' => $dbName,
                 'host' => $dbHost
@@ -238,46 +251,43 @@ private function configureApache(string $alias, string $targetPath): void
             if (!File::exists($this->instancesDir)) {
                 File::makeDirectory($this->instancesDir, 0755, true);
                 exec("chmod -R 755 {$this->instancesDir}");
-                Log::info("Created directory: {$this->instancesDir}");
+                $this->notifyProgress('directory_created', 'Created instances directory');
             }
 
-            Log::info("Step 1: Cloning template");
+            $this->notifyProgress('cloning', 'Cloning template');
             $this->copyDirectoryWithProgress($baseTemplate, $targetPath);
 
-            Log::info("Step 2: Creating database");
+            $this->notifyProgress('database', 'Creating database');
             $this->createRemoteDatabase($dbHost, $dbName, $dbUser, $dbPassword);
 
-            Log::info("Step 3: Generating .env file");
+            $this->notifyProgress('env', 'Generating .env file');
             $this->generateEnvFile($targetPath, $dbName, $dbHost, $dbUser, $dbPassword, $alias);
 
-            Log::info("Step 4: Updating Livewire config");
+            $this->notifyProgress('livewire', 'Updating Livewire config');
             $this->updateLivewireConfig($targetPath, $alias);
 
-            Log::info("Step 5: Configuring Apache");
+            $this->notifyProgress('apache', 'Configuring Apache');
             $this->configureApache($alias, $targetPath);
 
-            Log::info("Step 6: Running post-installation commands");
+            $this->notifyProgress('post_install', 'Running post-installation commands');
             $this->runPostInstallationCommands($targetPath, $dbHost, $dbName, $dbUser, $dbPassword);
 
-            Log::info("Step 7: Creating default users");
+            $this->notifyProgress('users', 'Creating default users');
             $this->createDefaultUsers($targetPath, $alias, $managerEmail, $itEmail);
 
-            Log::info("Provisioning completed successfully", [
-                'alias' => $alias,
-                'path' => $targetPath,
-                'url' => "{$this->baseUrl}/{$alias}"
-            ]);
-
-            return [
+            $result = [
                 'success' => true,
                 'path' => $targetPath,
                 'alias' => $alias,
                 'url' => "{$this->baseUrl}/{$alias}"
             ];
 
+            $this->notifyProgress('completed', 'Provisioning completed successfully', $result);
+
+            return $result;
+
         } catch (Exception $e) {
-            Log::error("Provisioning failed", [
-                'alias' => $alias ?? 'unknown',
+            $this->notifyProgress('failed', 'Provisioning failed: ' . $e->getMessage(), [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
@@ -380,9 +390,9 @@ private function configureApache(string $alias, string $targetPath): void
             chdir($targetPath);
 
             // Run composer install
-            $process = Process::fromShellCommandline('composer install --no-interaction --optimize-autoloader');
-            $process->setTimeout(300);
-            $process->mustRun();
+            // $process = Process::fromShellCommandline('composer install --no-interaction --optimize-autoloader');
+            // $process->setTimeout(300);
+            // $process->mustRun();
 
             // Run migrations using the temporary connection
             $process = Process::fromShellCommandline('php artisan migrate:fresh --force --database=temp_connection');
