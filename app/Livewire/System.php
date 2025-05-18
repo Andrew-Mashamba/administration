@@ -3,19 +3,49 @@
 namespace App\Livewire;
 
 use App\Models\User;
+use App\Models\Menu;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Livewire\Component;
 
 class System extends Component
 {
-    public $menu_id = 0;
-    public $tab_id = 0;
+    public $menu_id = 1; // Default to dashboard
+    public $tab_id = 1;
+    public $menuItems = [];
+    public $isLoading = false;
 
-    protected $listeners = ['menuItem' => 'handleMenuItem'];
-
+    protected $listeners = [
+        'menuItem' => 'handleMenuItem',
+        'refreshMenu' => 'refreshMenuState'
+    ];
 
     public function mount()
+    {
+        $this->initializeMenu();
+        $this->checkUserStatus();
+    }
+
+    protected function initializeMenu()
+    {
+        // Load menu items from database
+        $this->menuItems = Menu::where('system_id', 1)
+            ->orderBy('menu_number')
+            ->get(['id', 'menu_name', 'menu_title', 'menu_number'])
+            ->toArray();
+
+        // Get the current route name to determine initial tab
+        $routeName = request()->route()->getName();
+        if (str_contains($routeName, 'dashboard')) {
+            $this->menu_id = 1;
+        } elseif (str_contains($routeName, 'users')) {
+            $this->menu_id = 2;
+        } elseif (str_contains($routeName, 'institutions')) {
+            $this->menu_id = 3;
+        }
+    }
+
+    protected function checkUserStatus()
     {
         $user = Auth::user();
         if ($user) {
@@ -29,21 +59,28 @@ class System extends Component
             if (in_array($userStatus, ['PENDING', 'BLOCKED', 'DELETED'])) {
                 $this->menu_id = 9;
                 $this->tab_id = 9;
-            } else {
-                $this->menu_id = 1;
-                $this->tab_id = 1;
             }
         }
     }
 
     public function handleMenuItem($item)
     {
-        $this->menu_id = $item;
-        $this->tab_id = $item;
+        $this->isLoading = true;
+        $this->menu_id = (int)$item;
+        $this->tab_id = (int)$item;
+        $this->isLoading = false;
+    }
+
+    public function refreshMenuState()
+    {
+        $this->initializeMenu();
+        $this->checkUserStatus();
     }
 
     public function render()
     {
-        return view('livewire.system');
+        return view('livewire.system', [
+            'menuItems' => $this->menuItems
+        ]);
     }
 }
