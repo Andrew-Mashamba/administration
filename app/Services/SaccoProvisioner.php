@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Mail;
 use PDO;
 use Exception;
 use Jackiedo\DotenvEditor\DotenvEditor;
+use Symfony\Component\Process\Process;
 
 
 class SaccoProvisioner
@@ -374,46 +375,32 @@ private function configureApache(string $alias, string $targetPath): void
                 throw new Exception("Failed to connect to temporary database: " . $e->getMessage());
             }
 
-            $commands = [
-                'composer install --no-interaction --optimize-autoloader',
-                'php artisan migrate:fresh --force --path=database/migrations',
-                'php artisan db:seed',
-                'chown -R www-data:www-data storage bootstrap/cache',
-                'chmod -R 775 storage bootstrap/cache'
-            ];
+            // Change to target directory
+            $currentDir = getcwd();
+            chdir($targetPath);
 
-            foreach ($commands as $command) {
-                Log::info("Executing command", [
-                    'command' => $command,
-                    'targetPath' => $targetPath
-                ]);
+            // Run composer install
+            $process = Process::fromShellCommandline('composer install --no-interaction --optimize-autoloader');
+            $process->setTimeout(300);
+            $process->mustRun();
 
-                // Change to target directory before running command
-                $currentDir = getcwd();
-                chdir($targetPath);
+            // Run migrations using the temporary connection
+            $process = Process::fromShellCommandline('php artisan migrate:fresh --force --database=temp_connection');
+            $process->setTimeout(300);
+            $process->mustRun();
 
-                exec($command, $output, $returnCode);
+            // Run seeders
+            $process = Process::fromShellCommandline('php artisan db:seed --database=temp_connection');
+            $process->setTimeout(300);
+            $process->mustRun();
 
-                // Change back to original directory
-                chdir($currentDir);
+            // Set permissions
+            $process = Process::fromShellCommandline('chown -R apache:apache storage bootstrap/cache && chmod -R 775 storage bootstrap/cache');
+            $process->setTimeout(300);
+            $process->mustRun();
 
-                Log::info("Command execution result", [
-                    'command' => $command,
-                    'output' => $output,
-                    'returnCode' => $returnCode
-                ]);
-
-                if ($returnCode !== 0) {
-                    $errorOutput = implode("\n", $output);
-                    Log::error("Command failed", [
-                        'command' => $command,
-                        'output' => $errorOutput,
-                        'returnCode' => $returnCode
-                    ]);
-                    throw new Exception("Failed to execute command: {$command}. Error: {$errorOutput}");
-                }
-                Log::info("Successfully executed command", ['command' => $command]);
-            }
+            // Change back to original directory
+            chdir($currentDir);
 
         } catch (Exception $e) {
             Log::error("Error during post-installation commands", [
