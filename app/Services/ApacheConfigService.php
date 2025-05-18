@@ -95,24 +95,11 @@ BASH;
 
     private function executeConfigScript(string $alias, string $targetPath): void
     {
-
         $aliasEscaped = escapeshellarg($alias);
-
         $targetPathEscaped = escapeshellarg($targetPath);
 
-
-
-
-        $command = "sudo /usr/local/bin/manage-apache-config.sh {$aliasEscaped} {$targetPathEscaped }";
-        $logFile = '/var/log/manage-apache-config.log';
-
-        // Ensure the log file is writable
-        if (!file_exists($logFile)) {
-            touch($logFile);
-            //chmod($logFile, 0666);
-        }
-
-        $process = new Process([$command]);
+        $command = ['sudo', '/usr/local/bin/manage-apache-config.sh', $aliasEscaped, $targetPathEscaped];
+        $process = Process::fromShellCommandline(implode(' ', $command));
         $process->setTimeout(300); // 5 minutes timeout
 
         try {
@@ -121,19 +108,6 @@ BASH;
             Log::error("Apache config failed: " . $exception->getMessage());
             throw $exception;
         }
-
-
-
-
-       // $cmd = "sudo /usr/local/bin/manage-apache-config {$aliasEscaped} {$targetPathEscaped}";
-        // $cmd = "sudo /usr/local/bin/manage-apache-config {$aliasEscaped} {$targetPathEscaped} 2>&1";
-        // exec($cmd, $output, $returnCode);
-
-        // if ($returnCode !== 0) {
-        //     $errorOutput = implode("\n", $output);
-        //     Log::error("Apache config script failed:\nCommand: {$cmd}\nError:\n{$errorOutput}");
-        //     throw new Exception("Apache config failed: {$errorOutput}");
-        // }
     }
 
     public function removeConfig(string $alias): void
