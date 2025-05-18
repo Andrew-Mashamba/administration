@@ -42,6 +42,21 @@ return [
             'synchronous' => null,
         ],
 
+        'temp_connection' => [
+            'driver' => 'pgsql',
+            'url' => env('TEMP_DB_URL'),
+            'host' => env('TEMP_DB_HOST', '127.0.0.1'),
+            'port' => env('TEMP_DB_PORT', '5432'),
+            'database' => env('TEMP_DB_DATABASE', 'temp_db'),
+            'username' => env('TEMP_DB_USERNAME', 'root'),
+            'password' => env('TEMP_DB_PASSWORD', ''),
+            'charset' => env('TEMP_DB_CHARSET', 'utf8'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'search_path' => 'public',
+            'sslmode' => 'prefer',
+        ],
+
         'mysql' => [
             'driver' => 'mysql',
             'url' => env('DB_URL'),

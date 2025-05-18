@@ -20,7 +20,7 @@ class System extends Component
         $user = Auth::user();
         if ($user) {
             // Update verification status
-            $user->update(['verification_status' => 0]);
+            DB::table('users')->where('id', $user->id)->update(['verification_status' => 0]);
 
             // Get user status
             $userStatus = $user->status;

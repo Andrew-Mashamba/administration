@@ -390,35 +390,49 @@ CONF;
     {
         Log::info("Starting post-installation commands", ['targetPath' => $targetPath]);
 
-        // Store original connection
+        // Store original connection and disconnect
         $originalConnection = config('database.default');
+        DB::disconnect($originalConnection);
 
         try {
-            // Switch to the new database connection
+            // Configure and connect to temporary database
             config([
-                'database.connections.pgsql' => [
+                'database.connections.temp_connection' => [
                     'driver' => 'pgsql',
-                    'host' => '22.32.230.155',
-                    'port' => '5432',
+                    'url' => env('TEMP_DB_URL'),
+                    'host' => $dbHost,
+                    'port' => env('TEMP_DB_PORT', '5432'),
                     'database' => $dbName,
-                    'username' => 'postgres',
-                    'password' => 'postgres',
+                    'username' => $dbUser,
+                    'password' => $dbPassword,
+                    'charset' => env('TEMP_DB_CHARSET', 'utf8'),
+                    'prefix' => '',
+                    'prefix_indexes' => true,
+                    'search_path' => 'public',
+                    'sslmode' => 'prefer',
                 ]
             ]);
 
-            // Set as default connection
-            config(['database.default' => 'pgsql']);
+            // Set as default connection and ensure it's connected
+            config(['database.default' => 'temp_connection']);
+            DB::purge('temp_connection');
+            DB::reconnect('temp_connection');
 
-            // Clear connection cache
-            DB::purge('pgsql');
-            DB::reconnect('pgsql');
+            // Verify connection
+            try {
+                DB::connection('temp_connection')->getPdo();
+                Log::info("Successfully connected to temporary database", [
+                    'database' => $dbName,
+                    'host' => $dbHost
+                ]);
+            } catch (Exception $e) {
+                throw new Exception("Failed to connect to temporary database: " . $e->getMessage());
+            }
 
             $commands = [
                 'composer install --no-interaction --optimize-autoloader',
-                'php artisan migrate:fresh --force --path=database/migrations',  // Specify migrations path
+                'php artisan migrate:fresh --force --path=database/migrations',
                 'php artisan db:seed',
-                //'npm install',
-                //'npm run build',
                 'chown -R www-data:www-data storage bootstrap/cache',
                 'chmod -R 775 storage bootstrap/cache'
             ];
@@ -455,15 +469,35 @@ CONF;
                 }
                 Log::info("Successfully executed command", ['command' => $command]);
             }
+
+        } catch (Exception $e) {
+            Log::error("Error during post-installation commands", [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            throw $e;
         } finally {
-            // Reset to original connection
+            // Clean up temporary connection
+            DB::disconnect('temp_connection');
+            DB::purge('temp_connection');
+
+            // Restore original connection
             config(['database.default' => $originalConnection]);
-            DB::purge('pgsql');
             DB::reconnect($originalConnection);
 
-            Log::info("Database connection reset to original", [
-                'originalConnection' => $originalConnection
-            ]);
+            // Verify original connection is restored
+            try {
+                DB::connection($originalConnection)->getPdo();
+                Log::info("Successfully restored original database connection", [
+                    'connection' => $originalConnection
+                ]);
+            } catch (Exception $e) {
+                Log::error("Failed to restore original database connection", [
+                    'error' => $e->getMessage(),
+                    'connection' => $originalConnection
+                ]);
+                throw new Exception("Failed to restore original database connection: " . $e->getMessage());
+            }
         }
     }
 
