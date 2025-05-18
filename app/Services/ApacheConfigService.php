@@ -109,7 +109,7 @@ BASH;
         // Ensure the log file is writable
         if (!file_exists($logFile)) {
             touch($logFile);
-            chmod($logFile, 0666);
+            //chmod($logFile, 0666);
         }
 
         $process = new Process([$command]);
