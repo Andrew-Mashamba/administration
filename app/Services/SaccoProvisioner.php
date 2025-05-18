@@ -17,7 +17,7 @@ class SaccoProvisioner
 {
     private $baseDir;
     private $instancesDir;
-    private $baseUrl = 'http://22.32.241.42';
+    private $baseUrl = 'http://172.240.241.180';
 
     public function __construct()
     {
@@ -392,7 +392,7 @@ CONF;
 
         // Store original connection
         $originalConnection = config('database.default');
-        
+
         try {
             // Switch to the new database connection
             config([
@@ -405,10 +405,10 @@ CONF;
                     'password' => 'postgres',
                 ]
             ]);
-            
+
             // Set as default connection
             config(['database.default' => 'pgsql']);
-            
+
             // Clear connection cache
             DB::purge('pgsql');
             DB::reconnect('pgsql');
@@ -432,12 +432,12 @@ CONF;
                 // Change to target directory before running command
                 $currentDir = getcwd();
                 chdir($targetPath);
-                
+
                 exec($command, $output, $returnCode);
-                
+
                 // Change back to original directory
                 chdir($currentDir);
-                
+
                 Log::info("Command execution result", [
                     'command' => $command,
                     'output' => $output,
@@ -460,7 +460,7 @@ CONF;
             config(['database.default' => $originalConnection]);
             DB::purge('pgsql');
             DB::reconnect($originalConnection);
-            
+
             Log::info("Database connection reset to original", [
                 'originalConnection' => $originalConnection
             ]);

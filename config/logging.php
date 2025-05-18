@@ -60,7 +60,7 @@ return [
 
         'stack' => [
             'driver' => 'stack',
-            'channels' => explode(',', env('LOG_STACK', 'single')),
+            'channels' => ['daily', 'emergency'],
             'ignore_exceptions' => false,
         ],
 
@@ -74,9 +74,55 @@ return [
         'daily' => [
             'driver' => 'daily',
             'path' => storage_path('logs/laravel.log'),
-            'level' => env('LOG_LEVEL', 'debug'),
-            'days' => env('LOG_DAILY_DAYS', 14),
+            'level' => 'debug',
+            'days' => 30,
             'replace_placeholders' => true,
+            'permission' => 0664,
+        ],
+
+        'emergency' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/emergency.log'),
+            'level' => 'emergency',
+            'days' => 30,
+            'replace_placeholders' => true,
+            'permission' => 0664,
+        ],
+
+        'error' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/error.log'),
+            'level' => 'error',
+            'days' => 30,
+            'replace_placeholders' => true,
+            'permission' => 0664,
+        ],
+
+        'warning' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/warning.log'),
+            'level' => 'warning',
+            'days' => 30,
+            'replace_placeholders' => true,
+            'permission' => 0664,
+        ],
+
+        'info' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/info.log'),
+            'level' => 'info',
+            'days' => 30,
+            'replace_placeholders' => true,
+            'permission' => 0664,
+        ],
+
+        'debug' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/debug.log'),
+            'level' => 'debug',
+            'days' => 30,
+            'replace_placeholders' => true,
+            'permission' => 0664,
         ],
 
         'slack' => [
@@ -127,10 +173,6 @@ return [
         'null' => [
             'driver' => 'monolog',
             'handler' => NullHandler::class,
-        ],
-
-        'emergency' => [
-            'path' => storage_path('logs/laravel.log'),
         ],
 
     ],
