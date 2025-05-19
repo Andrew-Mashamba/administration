@@ -121,6 +121,8 @@ class ApacheConfigService
 
     private function generateApacheConfig(string $alias, string $targetPath): string
     {
+        // Use /var/log/httpd for CentOS/RHEL
+        $logDir = '/var/log/httpd';
         return <<<EOT
 <VirtualHost *:80>
     ServerName {$alias}.nbcsaccos.co.tz
@@ -132,8 +134,8 @@ class ApacheConfigService
         Require all granted
     </Directory>
 
-    ErrorLog \${APACHE_LOG_DIR}/{$alias}-error.log
-    CustomLog \${APACHE_LOG_DIR}/{$alias}-access.log combined
+    ErrorLog {$logDir}/{$alias}-error.log
+    CustomLog {$logDir}/{$alias}-access.log combined
 </VirtualHost>
 EOT;
     }
