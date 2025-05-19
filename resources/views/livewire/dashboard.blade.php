@@ -3,6 +3,25 @@
         <h3 class="text-lg font-medium text-gray-900">Dashboard</h3>
         <p class="mt-1 text-sm text-gray-600">Overview of SACCO provisioning status.</p>
     </div>
+	
+	
+	
+	
+	<div>
+    {{-- Knowing others is intelligence; knowing yourself is true wisdom. --}}
+    <div class="mb-6">
+        <livewire:saccos-management />
+    </div>
+    
+    <div class="mt-8">
+        <h2 class="text-lg font-semibold text-gray-900 mb-4">Provisioning Status</h2>
+        
+    </div>
+</div>
+
+
+
+
 
     <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
         <!-- Total Institutions -->
