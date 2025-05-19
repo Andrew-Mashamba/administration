@@ -29,7 +29,7 @@ TARGET_PATH=\$2
 # Create Apache config
 cat > /etc/httpd/conf.d/\${ALIAS}.conf << EOF
 <VirtualHost *:80>
-    ServerName \${ALIAS}.nbcsaccos.co.tz
+    ServerName \${ALIAS}.zima-uat.site
     DocumentRoot "\${TARGET_PATH}/public"
 
     <Directory "\${TARGET_PATH}/public">

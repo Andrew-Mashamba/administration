@@ -2,86 +2,141 @@
 
 namespace App\Services;
 
-use Exception;
+use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
+use Exception;
 use Symfony\Component\Process\Process;
-use Symfony\Component\Process\Exception\ProcessFailedException;
 
 class ApacheConfigService
 {
-    private $configDir;
-    private $logDir;
-    private $scriptPath;
+    private $apacheConfigDir;
+    private $apacheSitesDir;
+    private $workingDir;
 
     public function __construct()
     {
-        $this->configDir = '/etc/httpd/conf.d';
-        $this->logDir = '/var/log/httpd';
-        $this->scriptPath = storage_path('app/apache-config/manage-apache-config.sh');
+        $this->apacheConfigDir = '/etc/httpd/conf.d';
+        $this->apacheSitesDir = '/etc/httpd/conf.d';
+        $this->workingDir = '/var/www/html';
     }
 
     public function configure(string $alias, string $targetPath): void
     {
-        $timestamp = now()->toDateTimeString();
-        $instanceDomain = "{$alias}.nbcsaccos.co.tz";
-
         try {
-            // Ensure log directory exists
-            $this->ensureLogDirectory();
-
-            // Execute the script with sudo
-            $this->executeConfigScript($alias, $targetPath);
-
-            Log::info("[{$timestamp}] Apache configured successfully for '{$instanceDomain}'");
-        } catch (Exception $e) {
-            Log::error("[{$timestamp}] Apache configuration failed: " . $e->getMessage());
-            throw new Exception("Apache configuration failed: " . $e->getMessage());
-        }
-    }
-
-    private function ensureLogDirectory(): void
-    {
-        if (!is_dir($this->logDir)) {
-            if (!mkdir($this->logDir, 0755, true)) {
-                throw new Exception("Failed to create log directory: {$this->logDir}");
+            // Validate paths
+            if (!File::exists($targetPath)) {
+                throw new Exception("Target path does not exist: {$targetPath}");
             }
-        }
-    }
 
-    private function executeConfigScript(string $alias, string $targetPath): void
-    {
-        $aliasEscaped = escapeshellarg($alias);
-        $targetPathEscaped = escapeshellarg($targetPath);
+            // Ensure Apache directories exist
+            if (!File::exists($this->apacheConfigDir)) {
+                throw new Exception("Apache configuration directory does not exist: {$this->apacheConfigDir}");
+            }
 
-        $command = ['sudo', '/usr/local/bin/manage-apache-config.sh', $aliasEscaped, $targetPathEscaped];
-        $process = Process::fromShellCommandline(implode(' ', $command));
-        $process->setTimeout(300); // 5 minutes timeout
+            // Create Apache configuration
+            $configContent = $this->generateApacheConfig($alias, $targetPath);
+            $configPath = "{$this->apacheConfigDir}/{$alias}.conf";
 
-        try {
+            // Write configuration file using sudo
+            $tempFile = tempnam(sys_get_temp_dir(), 'apache_');
+            if (!File::put($tempFile, $configContent)) {
+                throw new Exception("Failed to write temporary configuration file");
+            }
+
+            // Move the file to Apache config directory using sudo
+            $process = new Process(['sudo', 'mv', $tempFile, $configPath]);
+            $process->setWorkingDirectory($this->workingDir);
+            $process->setTimeout(30);
             $process->mustRun();
-        } catch (ProcessFailedException $exception) {
-            Log::error("Apache config failed: " . $exception->getMessage());
-            throw $exception;
+
+            // Set proper permissions
+            $process = new Process(['sudo', 'chown', 'root:root', $configPath]);
+            $process->setWorkingDirectory($this->workingDir);
+            $process->setTimeout(30);
+            $process->mustRun();
+
+            $process = new Process(['sudo', 'chmod', '644', $configPath]);
+            $process->setWorkingDirectory($this->workingDir);
+            $process->setTimeout(30);
+            $process->mustRun();
+
+            // Test Apache configuration
+            $process = new Process(['sudo', 'apachectl', '-t']);
+            $process->setWorkingDirectory($this->workingDir);
+            $process->setTimeout(30);
+            $process->mustRun();
+
+            // Reload Apache
+            // $process = new Process(['sudo', 'systemctl', 'reload', 'httpd']);
+            // $process->setWorkingDirectory($this->workingDir);
+            // $process->setTimeout(30);
+            // $process->mustRun();
+
+            Log::info("Apache configuration completed successfully", [
+                'alias' => $alias,
+                'config_path' => "configPath"
+            ]);
+
+        } catch (Exception $e) {
+            Log::error("Apache configuration failed xxxxxxxxxxxxxxxxxxx", [
+                'error' => $e->getMessage(),
+                'alias' => $alias,
+                'target_path' => $targetPath
+            ]);
+            throw $e;
         }
     }
 
     public function removeConfig(string $alias): void
     {
-        $configFile = "{$this->configDir}/{$alias}.conf";
+        try {
+            $configPath = "{$this->apacheConfigDir}/{$alias}.conf";
 
-        if (file_exists($configFile)) {
-            $cmd = "sudo rm {$configFile}";
-            exec($cmd, $output, $returnCode);
-
-            if ($returnCode !== 0) {
-                throw new Exception("Failed to remove Apache configuration for {$alias}");
+            // Remove configuration file using sudo
+            if (File::exists($configPath)) {
+                $process = new Process(['sudo', 'rm', $configPath]);
+                $process->setWorkingDirectory($this->workingDir);
+                $process->setTimeout(30);
+                $process->mustRun();
             }
 
             // Reload Apache
-            exec("sudo systemctl reload httpd", $output, $returnCode);
-            if ($returnCode !== 0) {
-                throw new Exception("Failed to reload Apache after removing configuration");
-            }
+            $process = new Process(['sudo', 'systemctl', 'reload', 'httpd']);
+            $process->setWorkingDirectory($this->workingDir);
+            $process->setTimeout(30);
+            $process->mustRun();
+
+            Log::info("Apache configuration removed successfully", [
+                'alias' => $alias
+            ]);
+
+        } catch (Exception $e) {
+            Log::error("Failed to remove Apache configuration", [
+                'error' => $e->getMessage(),
+                'alias' => $alias
+            ]);
+            throw $e;
         }
+    }
+
+    private function generateApacheConfig(string $alias, string $targetPath): string
+    {
+        // Use /var/log/httpd for CentOS/RHEL
+        $logDir = '/var/log/httpd';
+        return <<<EOT
+<VirtualHost *:80>
+    ServerName {$alias}.zima-uat.site
+    DocumentRoot {$targetPath}/public
+
+    <Directory {$targetPath}/public>
+        Options Indexes FollowSymLinks
+        AllowOverride All
+        Require all granted
+    </Directory>
+
+    ErrorLog {$logDir}/{$alias}-error.log
+    CustomLog {$logDir}/{$alias}-access.log combined
+</VirtualHost>
+EOT;
     }
 }

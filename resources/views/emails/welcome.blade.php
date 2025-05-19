@@ -55,7 +55,7 @@
     </div>
 
     <div class="content">
-        <p>Dear {{ $name }},</p>
+        <p>Dear {{ $name ?? 'User' }},</p>
 
         <p>Welcome to your new SACCO instance! Your account has been successfully created and is ready to use.</p>
 

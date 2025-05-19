@@ -20,10 +20,11 @@ class SaccoProvisioner
     private $instancesDir;
     private $baseUrl = 'http://172.240.241.180';
     private $progressCallback;
+    private $workingDir = '/var/www/html/administration';
 
     public function __construct()
     {
-        $this->baseDir = dirname(base_path());
+        $this->baseDir = '/var/www/html';
         $this->instancesDir = "{$this->baseDir}/instances";
     }
 
@@ -44,25 +45,49 @@ class SaccoProvisioner
         set_time_limit(0);
         Log::info("Starting directory copy from {$source} to {$destination}");
 
+        // Ensure source exists
         if (!File::exists($source)) {
             throw new Exception("Source directory not found: {$source}");
         }
 
+        // Ensure destination exists with proper permissions
         if (!File::exists($destination)) {
-            File::makeDirectory($destination, 0755, true);
+            if (!File::makeDirectory($destination, 0755, true)) {
+                throw new Exception("Failed to create destination directory: {$destination}");
+            }
+            // Set proper ownership
+            exec("chown -R apache:apache " . escapeshellarg($destination));
             Log::info("Created destination directory: {$destination}");
         }
+
+        // Use absolute paths
+        $source = realpath($source);
+        $destination = realpath($destination);
 
         // Use rsync if available for better performance
         exec('which rsync', $output, $returnCode);
         if ($returnCode === 0) {
-            $rsyncCommand = "rsync -av --progress {$source}/ {$destination}/";
-            exec($rsyncCommand, $output, $returnCode);
-            if ($returnCode === 0) {
+            // Use absolute paths and --no-relative option to avoid working directory issues
+            $rsyncCommand = sprintf(
+                'rsync -av --no-relative --progress %s/ %s/',
+                escapeshellarg($source),
+                escapeshellarg($destination)
+            );
+            
+            $process = new Process(['rsync', '-av', '--no-relative', '--progress', $source . '/', $destination . '/']);
+            $process->setTimeout(300);
+            
+            try {
+                $process->mustRun();
                 Log::info("Directory copied successfully using rsync");
+                // Set proper permissions after copy
+                exec("chown -R apache:apache " . escapeshellarg($destination));
                 return;
+            } catch (Exception $e) {
+                Log::warning("Rsync failed, falling back to PHP copy", [
+                    'error' => $e->getMessage()
+                ]);
             }
-            Log::warning("Rsync failed, falling back to PHP copy");
         }
 
         // Fallback to PHP's copy if rsync fails
@@ -89,9 +114,12 @@ class SaccoProvisioner
 
             if ($currentFile % 10 === 0) {
                 $progress = round(($currentFile / $totalFiles) * 100, 2);
-                //Log::info("Copying files... {$progress}% complete");
+                Log::info("Copying files... {$progress}% complete");
             }
         }
+
+        // Set proper permissions after copy
+        exec("chown -R apache:apache " . escapeshellarg($destination));
 
         Log::info("Directory copy completed: {$totalFiles} files copied");
     }
@@ -116,11 +144,21 @@ class SaccoProvisioner
 private function configureApache(string $alias, string $targetPath): void
 {
     try {
+        // Ensure the target path exists
+        if (!File::exists($targetPath)) {
+            throw new Exception("Target path does not exist: {$targetPath}");
+        }
+
         $apacheService = new ApacheConfigService();
         $apacheService->configure($alias, $targetPath);
+
     } catch (Exception $e) {
-        Log::error("Apache configuration failed: " . $e->getMessage());
-        throw $e;
+        Log::error("Apache configuration failed yyyyyyyyyyyyyy", [
+            'error' => $e->getMessage(),
+            'alias' => $alias,
+            'target_path' => $targetPath
+        ]);
+        throw new Exception("Apache configuration failed bbbbbbbbbbbbbbb: " . $e->getMessage());
     }
 }
 
@@ -171,16 +209,24 @@ private function configureApache(string $alias, string $targetPath): void
 
         // Use the instance's database connection
         foreach ($users as $user) {
-            DB::connection('instance')->table('users')->insert([
-                'name' => $user['name'],
-                'email' => $user['email'],
-                'password' => Hash::make($user['password']),
-                'created_at' => now(),
-                'updated_at' => now()
-            ]);
+            try {
+                DB::connection('instance')->table('users')->insertOrIgnore([
+                    'name' => $user['name'],
+                    'email' => $user['email'],
+                    'password' => Hash::make($user['password']),
+                    'created_at' => now(),
+                    'updated_at' => now()
+                ]);
 
-            // Send welcome email
-            $this->sendWelcomeEmail($user['email'], $user['password'], $alias);
+                // Send welcome email
+                $this->sendWelcomeEmail($user['email'], $user['password'], $alias);
+            } catch (Exception $e) {
+                Log::warning("Failed to create user, continuing with next user", [
+                    'email' => $user['email'],
+                    'error' => $e->getMessage()
+                ]);
+                continue;
+            }
         }
 
         Log::info("Default users created for {$alias}");
@@ -189,15 +235,16 @@ private function configureApache(string $alias, string $targetPath): void
     private function sendWelcomeEmail(string $email, string $password, string $alias): void
     {
         $url = "{$this->baseUrl}/{$alias}";
-        $instanceDomain = "{$alias}.nbcsaccos.co.tz";
+        $instanceDomain = "{$alias}.zima-uat.site";
+        $name = explode('@', $email)[0]; // Extract name from email
 
         try {
             Mail::to($email)
                 ->queue(new \App\Mail\WelcomeEmail([
                     'email' => $email,
                     'password' => $password,
-                    'url' => "http://{$instanceDomain}",
-                    'name' => explode('@', $email)[0] // Extract name from email
+                    'url' => "https://{$instanceDomain}",
+                    'name' => $name
                 ]));
 
             Log::info("Welcome email queued for {$email}");
@@ -216,7 +263,7 @@ private function configureApache(string $alias, string $targetPath): void
                     'email' => $email,
                     'password' => $password,
                     'url' => "https://{$instanceDomain}",
-                    'name' => explode('@', $email)[0]
+                    'name' => $name
                 ]),
                 'error' => $e->getMessage(),
                 'created_at' => now(),
@@ -230,6 +277,13 @@ private function configureApache(string $alias, string $targetPath): void
         try {
             set_time_limit(0);
             ini_set('memory_limit', '512M');
+
+            // Ensure we have the correct working directory
+            $currentDir = getcwd();
+            if ($currentDir === false) {
+                // If we can't get current directory, try to set it to a known good location
+                chdir('/var/www/html');
+            }
 
             if (empty($alias) || empty($dbName) || empty($dbHost)) {
                 throw new Exception("Alias, database name, and database host are required");
@@ -322,11 +376,13 @@ private function configureApache(string $alias, string $targetPath): void
             'DB_DATABASE' => $dbName,
             'DB_USERNAME' => $dbUser,
             'DB_PASSWORD' => $dbPassword,
+            'DB_SCHEMA' => 'public',
+            'DB_SSL_MODE' => 'prefer',
         ]);
 
         // Set application configuration
         $editor->setKeys([
-            'APP_URL' => "http://{$alias}.nbcsaccos.co.tz",
+            'APP_URL' => "http://{$alias}.zima-uat.site",
             'APP_ENV' => 'production',
             'APP_DEBUG' => 'false',
             'LOG_CHANNEL' => 'daily',
@@ -351,66 +407,96 @@ private function configureApache(string $alias, string $targetPath): void
         DB::disconnect($originalConnection);
 
         try {
-            // Configure and connect to temporary database
-            config([
-                'database.connections.temp_connection' => [
-                    'driver' => 'pgsql',
-                    'url' => env('TEMP_DB_URL'),
-                    'host' => $dbHost,
-                    'port' => env('TEMP_DB_PORT', '5432'),
-                    'database' => $dbName,
-                    'username' => $dbUser,
-                    'password' => $dbPassword,
-                    'charset' => env('TEMP_DB_CHARSET', 'utf8'),
-                    'prefix' => '',
-                    'prefix_indexes' => true,
-                    'search_path' => 'public',
-                    'sslmode' => 'prefer',
-                ]
-            ]);
+            // Create a temporary database config file
+            $tempConfigPath = "{$targetPath}/config/database.php";
+            $configContent = <<<PHP
+<?php
 
-            // Set as default connection and ensure it's connected
-            config(['database.default' => 'temp_connection']);
-            DB::purge('temp_connection');
-            DB::reconnect('temp_connection');
+return [
+    'default' => 'pgsql',
+    'migrations' => 'migrations',
+    'connections' => [
+        'pgsql' => [
+            'driver' => 'pgsql',
+            'host' => '{$dbHost}',
+            'port' => '5432',
+            'database' => '{$dbName}',
+            'username' => '{$dbUser}',
+            'password' => '{$dbPassword}',
+            'charset' => 'utf8',
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'search_path' => 'public',
+            'sslmode' => 'prefer',
+            'migrations' => 'migrations',
+        ],
+    ],
+];
+PHP;
+            file_put_contents($tempConfigPath, $configContent);
 
-            // Verify connection
-            try {
-                DB::connection('temp_connection')->getPdo();
-                Log::info("Successfully connected to temporary database", [
-                    'database' => $dbName,
-                    'host' => $dbHost
-                ]);
-            } catch (Exception $e) {
-                throw new Exception("Failed to connect to temporary database: " . $e->getMessage());
-            }
+            // Create a temporary .env file for the artisan command
+            $tempEnvPath = "{$targetPath}/.env.temp";
+            $envContent = <<<ENV
+APP_NAME=Laravel
+APP_ENV=local
+APP_KEY=base64:your-app-key-here
+APP_DEBUG=true
+APP_URL=http://localhost
 
-            // Change to target directory
-            $currentDir = getcwd();
-            chdir($targetPath);
+LOG_CHANNEL=stack
+LOG_DEPRECATIONS_CHANNEL=null
+LOG_LEVEL=debug
 
-            // Run composer install
-            // $process = Process::fromShellCommandline('composer install --no-interaction --optimize-autoloader');
-            // $process->setTimeout(300);
-            // $process->mustRun();
+DB_CONNECTION=pgsql
+DB_HOST={$dbHost}
+DB_PORT=5432
+DB_DATABASE={$dbName}
+DB_USERNAME={$dbUser}
+DB_PASSWORD={$dbPassword}
 
-            // Run migrations using the temporary connection
-            $process = Process::fromShellCommandline('php artisan migrate:fresh --force --database=temp_connection');
+BROADCAST_DRIVER=log
+CACHE_DRIVER=file
+FILESYSTEM_DISK=local
+QUEUE_CONNECTION=sync
+SESSION_DRIVER=file
+SESSION_LIFETIME=120
+ENV;
+            file_put_contents($tempEnvPath, $envContent);
+
+            // Run migrations with the temporary .env file
+            $process = new Process(['php', 'artisan', 'migrate:fresh', '--force', '--env=local']);
+            $process->setWorkingDirectory($targetPath);
+            $process->setEnv(['APP_ENV' => 'local']);
             $process->setTimeout(300);
             $process->mustRun();
 
             // Run seeders
-            $process = Process::fromShellCommandline('php artisan db:seed --database=temp_connection');
+            $process = new Process(['php', 'artisan', 'db:seed', '--env=local']);
+            $process->setWorkingDirectory($targetPath);
+            $process->setEnv(['APP_ENV' => 'local']);
             $process->setTimeout(300);
             $process->mustRun();
 
             // Set permissions
-            $process = Process::fromShellCommandline('chown -R apache:apache storage bootstrap/cache && chmod -R 775 storage bootstrap/cache');
+            $process = new Process(['chown', '-R', 'apache:apache', 'storage', 'bootstrap/cache']);
+            $process->setWorkingDirectory($targetPath);
             $process->setTimeout(300);
             $process->mustRun();
 
-            // Change back to original directory
-            chdir($currentDir);
+            $process = new Process(['chmod', '-R', '775', 'storage', 'bootstrap/cache']);
+            $process->setWorkingDirectory($targetPath);
+            $process->setTimeout(300);
+            $process->mustRun();
+
+            // Clean up temporary files
+            unlink($tempConfigPath);
+            unlink($tempEnvPath);
+
+            // Restore original connection
+            config(['database.default' => $originalConnection]);
+            DB::purge('pgsql');
+            DB::reconnect($originalConnection);
 
         } catch (Exception $e) {
             Log::error("Error during post-installation commands", [
@@ -418,28 +504,6 @@ private function configureApache(string $alias, string $targetPath): void
                 'trace' => $e->getTraceAsString()
             ]);
             throw $e;
-        } finally {
-            // Clean up temporary connection
-            DB::disconnect('temp_connection');
-            DB::purge('temp_connection');
-
-            // Restore original connection
-            config(['database.default' => $originalConnection]);
-            DB::reconnect($originalConnection);
-
-            // Verify original connection is restored
-            try {
-                DB::connection($originalConnection)->getPdo();
-                Log::info("Successfully restored original database connection", [
-                    'connection' => $originalConnection
-                ]);
-            } catch (Exception $e) {
-                Log::error("Failed to restore original database connection", [
-                    'error' => $e->getMessage(),
-                    'connection' => $originalConnection
-                ]);
-                throw new Exception("Failed to restore original database connection: " . $e->getMessage());
-            }
         }
     }
 

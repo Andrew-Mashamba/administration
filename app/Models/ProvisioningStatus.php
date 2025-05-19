@@ -12,6 +12,12 @@ class ProvisioningStatus extends Model
         'step',
         'message',
         'data',
+        'db_name',
+        'db_host',
+        'db_user',
+        'db_password',
+        'manager_email',
+        'it_email',
         'started_at',
         'completed_at'
     ];
