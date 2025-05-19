@@ -60,21 +60,21 @@ class SaccoProvisioner
             Log::info("Created destination directory: {$destination}");
         }
 
-        // Use absolute paths for rsync
+        // Use absolute paths
         $source = realpath($source);
         $destination = realpath($destination);
 
         // Use rsync if available for better performance
         exec('which rsync', $output, $returnCode);
         if ($returnCode === 0) {
+            // Use absolute paths and --no-relative option to avoid working directory issues
             $rsyncCommand = sprintf(
-                'rsync -av --progress %s/ %s/',
+                'rsync -av --no-relative --progress %s/ %s/',
                 escapeshellarg($source),
                 escapeshellarg($destination)
             );
             
-            $process = Process::fromShellCommandline($rsyncCommand);
-            $process->setWorkingDirectory($this->workingDir);
+            $process = new Process(['rsync', '-av', '--no-relative', '--progress', $source . '/', $destination . '/']);
             $process->setTimeout(300);
             
             try {
@@ -269,9 +269,11 @@ private function configureApache(string $alias, string $targetPath): void
             set_time_limit(0);
             ini_set('memory_limit', '512M');
 
-            // Set working directory
-            if (!chdir($this->workingDir)) {
-                throw new Exception("Failed to set working directory to: {$this->workingDir}");
+            // Ensure we have the correct working directory
+            $currentDir = getcwd();
+            if ($currentDir === false) {
+                // If we can't get current directory, try to set it to a known good location
+                chdir('/var/www/html');
             }
 
             if (empty($alias) || empty($dbName) || empty($dbHost)) {
