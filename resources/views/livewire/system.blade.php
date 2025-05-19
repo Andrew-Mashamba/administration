@@ -1,38 +1,39 @@
 <div>
-    <div wire:loading.remove>
-        @switch($menu_id)
-            @case(1)
-                <livewire:dashboard />
-                @break
-            @case(2)
-                <div class="p-6">
-                    <div class="mb-6">
-                        <h3 class="text-lg font-medium text-gray-900">Institutions</h3>
-                        <p class="mt-1 text-sm text-gray-600">Manage SACCOs and view provisioning status.</p>
-                    </div>
-                    <livewire:provisioning-status-list />
+    @if($isLoading)
+        <div class="w-full p-2">
+            <div class="flex items-center justify-center min-h-[calc(100vh-4rem)] bg-white w-full rounded-md">
+                <div class="text-center m-auto">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="white" viewBox="0 0 24 24" stroke-width="1.5"
+                         stroke="gray" class="w-16 h-16 animate-spin">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" />
+                    </svg>
+                    <p class="mt-2 text-lg text-gray-700">Loading...</p>
                 </div>
-                @break
-            @case(3)
-                <livewire:users />
-                @break
-            @case(4)
-                <livewire:settings />
-                @break
-            @case(9)
-                <div class="min-h-[calc(100vh-4rem)] flex items-center justify-center">
-                    <div class="text-center">
-                        <h2 class="text-2xl font-semibold text-red-600 mb-4">Account Status Issue</h2>
-                        <p class="text-gray-600">Your account is not active or has been suspended. Please contact support for assistance.</p>
+            </div>
+        </div>
+    @else
+        <div class="min-h-[calc(100vh-4rem)]">
+            @switch($menu_id)
+                @case(1)
+                    <livewire:dashboard.dashboard/>
+                    @break
+                @case(2)
+                    <livewire:users.users />
+                    @break
+                @case(3)
+                    <livewire:institutions.institution />
+                    @break
+                @case(9)
+                    <div class="p-4">
+                        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+                            <strong class="font-bold">Account Status Issue!</strong>
+                            <span class="block sm:inline"> Your account is either pending, blocked, or deleted. Please contact support for assistance.</span>
+                        </div>
                     </div>
-                </div>
-                @break
-            @default
-                <livewire:dashboard />
-        @endswitch
-    </div>
-
-    <div wire:loading class="min-h-[calc(100vh-4rem)] flex items-center justify-center">
-        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
-    </div>
+                    @break
+                @default
+                    <livewire:dashboard.dashboard/>
+            @endswitch
+        </div>
+    @endif
 </div>
