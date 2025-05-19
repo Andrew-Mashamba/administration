@@ -20,10 +20,11 @@ class SaccoProvisioner
     private $instancesDir;
     private $baseUrl = 'http://172.240.241.180';
     private $progressCallback;
+    private $workingDir = '/var/www/html/administration';
 
     public function __construct()
     {
-        $this->baseDir = dirname(base_path());
+        $this->baseDir = '/var/www/html';
         $this->instancesDir = "{$this->baseDir}/instances";
     }
 
@@ -43,6 +44,11 @@ class SaccoProvisioner
     {
         set_time_limit(0);
         Log::info("Starting directory copy from {$source} to {$destination}");
+
+        // Ensure we're in the correct working directory
+        if (!chdir($this->workingDir)) {
+            throw new Exception("Failed to set working directory to: {$this->workingDir}");
+        }
 
         // Ensure source exists
         if (!File::exists($source)) {
@@ -67,7 +73,8 @@ class SaccoProvisioner
         exec('which rsync', $output, $returnCode);
         if ($returnCode === 0) {
             $rsyncCommand = sprintf(
-                'rsync -av --progress %s/ %s/',
+                'cd %s && rsync -av --progress %s/ %s/',
+                escapeshellarg($this->workingDir),
                 escapeshellarg($source),
                 escapeshellarg($destination)
             );
@@ -262,6 +269,11 @@ private function configureApache(string $alias, string $targetPath): void
         try {
             set_time_limit(0);
             ini_set('memory_limit', '512M');
+
+            // Set working directory
+            if (!chdir($this->workingDir)) {
+                throw new Exception("Failed to set working directory to: {$this->workingDir}");
+            }
 
             if (empty($alias) || empty($dbName) || empty($dbHost)) {
                 throw new Exception("Alias, database name, and database host are required");
