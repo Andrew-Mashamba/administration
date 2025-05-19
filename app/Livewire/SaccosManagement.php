@@ -8,6 +8,9 @@ use Livewire\WithPagination;
 use Livewire\Component;
 use App\Services\SaccoProvisioner;
 use App\Jobs\ProvisionSaccoJob;
+use Illuminate\Support\Facades\DB;
+use PDO;
+use PDOException;
 
 class SaccosManagement extends Component
 {
@@ -96,7 +99,7 @@ class SaccosManagement extends Component
             $this->db_name = 'db_' . str_replace('-', '_', $this->alias);
             $this->db_host = env('DB_HOST', '127.0.0.1');
             $this->db_user = env('DB_USERNAME');
-            $this->db_password = env('DB_PASSWORD');            
+            $this->db_password = env('DB_PASSWORD');
             $this->status = 'active';
         }
     }
@@ -124,10 +127,44 @@ class SaccosManagement extends Component
     public function saveSaccos()
     {
         $this->isLoading = true;
-        // try {
-            $this->validate();
 
-            Institution::create([
+        try {
+            DB::beginTransaction();
+
+            // Validate input
+            $this->validate([
+                'name' => 'required|string|max:255',
+                'location' => 'required|string|max:255',
+                'contact_person' => 'required|string|max:255',
+                'phone' => 'required|string|max:20',
+                'email' => 'required|email|max:255',
+                'alias' => 'required|string|max:50|unique:institutions,alias',
+                'db_name' => 'required|string|max:50|unique:institutions,db_name',
+                'db_host' => 'required|string|max:255',
+                'db_user' => 'required|string|max:255',
+                'db_password' => 'required|string|max:255',
+                'institution_id' => 'required|string|max:50|unique:institutions,institution_id',
+                'manager_email' => 'required|email|max:255',
+                'manager_phone_number' => 'required|string|max:20',
+                'it_email' => 'required|email|max:255',
+                'it_phone_number' => 'required|string|max:20',
+                'institution_type' => 'required|string|max:50',
+                'status' => 'required|string|max:20',
+            ]);
+
+            // Test database connection before saving
+            try {
+                $testConnection = new PDO(
+                    "pgsql:host={$this->db_host};dbname={$this->db_name}",
+                    $this->db_user,
+                    $this->db_password
+                );
+            } catch (PDOException $e) {
+                throw new \Exception('Invalid database credentials: ' . $e->getMessage());
+            }
+
+            // Create institution with encrypted sensitive data
+            $institution = Institution::create([
                 'name' => $this->name,
                 'location' => $this->location,
                 'contact_person' => $this->contact_person,
@@ -136,8 +173,8 @@ class SaccosManagement extends Component
                 'alias' => $this->alias,
                 'db_name' => $this->db_name,
                 'db_host' => $this->db_host,
-                'db_user' => $this->db_user,
-                'db_password' => $this->db_password,
+                'db_user' => encrypt($this->db_user),
+                'db_password' => encrypt($this->db_password),
                 'institution_id' => $this->institution_id,
                 'manager_email' => $this->manager_email,
                 'manager_phone_number' => $this->manager_phone_number,
@@ -147,10 +184,8 @@ class SaccosManagement extends Component
                 'status' => $this->status,
             ]);
 
-            $this->isCreating = false;
-
-        try {
-            (new SaccoProvisioner())->provision(
+            // Dispatch the provisioning job
+            ProvisionSaccoJob::dispatch(
                 $this->alias,
                 $this->db_name,
                 $this->db_host,
@@ -159,11 +194,11 @@ class SaccosManagement extends Component
                 $this->manager_email,
                 $this->it_email
             );
-            session()->flash('message', 'SACCO provisioned successfully via shared PostgreSQL!');
-        } catch (\Exception $e) {
-            session()->flash('error', 'Provisioning failed: ' . $e->getMessage());
-        }
 
+            DB::commit();
+            session()->flash('message', 'SACCO creation initiated. Provisioning is in progress.');
+
+            // Reset form
             $this->reset([
                 'name', 'location', 'contact_person', 'phone', 'email',
                 'institution_type', 'status',
@@ -171,12 +206,14 @@ class SaccosManagement extends Component
                 'manager_email', 'manager_phone_number', 'it_email', 'it_phone_number'
             ]);
 
-            session()->flash('message', 'Institution created successfully.');
-        // } catch (\Exception $e) {
-        //     session()->flash('error', 'Error creating institution: ' . $e->getMessage());
-        // } finally {
+            $this->isCreating = false;
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            session()->flash('error', 'Error: ' . $e->getMessage());
+        } finally {
             $this->isLoading = false;
-        // }
+        }
     }
 
     public function softDeleteSaccos($id)
@@ -189,7 +226,7 @@ class SaccosManagement extends Component
     public function toggleStatus($id)
     {
         $this->status = $this->status === 'active' ? 'inactive' : 'active';
-        
+
         if ($id) {
             $saccos = Institution::findOrFail($id);
             $saccos->status = $this->status;

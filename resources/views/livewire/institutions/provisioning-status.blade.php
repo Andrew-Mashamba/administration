@@ -63,7 +63,7 @@
         <div class="p-4">
             <div class="flex flex-col md:flex-row gap-4">
                 <div class="flex-1">
-                    <input wire:model.live="search" type="text" placeholder="Search by alias..." 
+                    <input wire:model.live="search" type="text" placeholder="Search by alias..."
                            class="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
                 </div>
                 <div class="w-full md:w-48">
@@ -88,6 +88,7 @@
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">SACCO</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Progress</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Details</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Started</th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                     </tr>
@@ -115,16 +116,95 @@
                                 </div>
                                 <span class="text-xs text-gray-500 mt-1">{{ $status->progress }}%</span>
                             </td>
+                            <td class="px-6 py-4">
+                                <div class="text-sm text-gray-900">
+                                    @if($status->step)
+                                        <div class="font-medium">Current Step: {{ $this->getStepDescription($status->step) }}</div>
+                                        @if($status->status === 'in_progress')
+                                            <div class="mt-1">
+                                                <div class="flex items-center text-xs text-gray-500">
+                                                    <span>Progress: {{ $status->progress }}%</span>
+                                                    @if($nextStep = $this->getNextStep($status->step))
+                                                        <span class="mx-2">→</span>
+                                                        <span>Next: {{ $this->getStepDescription($nextStep) }}</span>
+                                                    @endif
+                                                </div>
+                                                @if($timeRemaining = $this->getEstimatedTimeRemaining($status))
+                                                    <div class="text-xs text-gray-500 mt-1">
+                                                        Estimated time remaining: {{ $timeRemaining }}
+                                                    </div>
+                                                @endif
+                                            </div>
+                                        @endif
+                                    @endif
+                                    @if($status->message)
+                                        <div class="text-gray-600 mt-1">{{ $status->message }}</div>
+                                    @endif
+                                    <div class="mt-2 space-x-2">
+                                        @if($status->status === 'failed' && $status->data)
+                                            <button wire:click="$set('showErrorDetails', {{ $status->id }})"
+                                                    class="text-red-600 hover:text-red-900 text-sm">
+                                                Show Error Details
+                                            </button>
+                                        @endif
+                                        <button wire:click="getLogs({{ $status->id }})"
+                                                class="text-blue-600 hover:text-blue-900 text-sm">
+                                            View Logs
+                                        </button>
+                                    </div>
+                                    @if($showErrorDetails === $status->id)
+                                        <div class="mt-2 p-3 bg-red-50 rounded-lg">
+                                            <pre class="text-xs text-red-800 overflow-x-auto">{{ json_encode($status->data, JSON_PRETTY_PRINT) }}</pre>
+                                        </div>
+                                    @endif
+                                    @if($showLogs && $showLogs['provisioning'])
+                                        <div class="mt-4">
+                                            <div class="border rounded-lg overflow-hidden">
+                                                <div class="bg-gray-50 px-4 py-2 border-b">
+                                                    <h4 class="text-sm font-medium text-gray-700">Provisioning Logs</h4>
+                                                </div>
+                                                <div class="p-4">
+                                                    <div class="space-y-4">
+                                                        @if($showLogs['provisioning'])
+                                                            <div>
+                                                                <h5 class="text-xs font-medium text-gray-500 mb-1">Main Log</h5>
+                                                                <pre class="text-xs bg-gray-50 p-2 rounded overflow-x-auto max-h-40">{{ $showLogs['provisioning'] }}</pre>
+                                                            </div>
+                                                        @endif
+                                                        @if($showLogs['error'])
+                                                            <div>
+                                                                <h5 class="text-xs font-medium text-gray-500 mb-1">Error Log</h5>
+                                                                <pre class="text-xs bg-red-50 p-2 rounded overflow-x-auto max-h-40">{{ $showLogs['error'] }}</pre>
+                                                            </div>
+                                                        @endif
+                                                        @if($showLogs['debug'])
+                                                            <div>
+                                                                <h5 class="text-xs font-medium text-gray-500 mb-1">Debug Log</h5>
+                                                                <pre class="text-xs bg-blue-50 p-2 rounded overflow-x-auto max-h-40">{{ $showLogs['debug'] }}</pre>
+                                                            </div>
+                                                        @endif
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    @endif
+                                </div>
+                            </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                                 {{ $status->created_at->diffForHumans() }}
+                                @if($status->status === 'in_progress')
+                                    <div class="text-xs text-gray-400">
+                                        Running for {{ $status->started_at->diffForHumans() }}
+                                    </div>
+                                @endif
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                 @if($status->status === 'failed')
-                                    <button wire:click="retryProvisioning({{ $status->id }})" 
+                                    <button wire:click="retryProvisioning({{ $status->id }})"
                                             class="text-blue-600 hover:text-blue-900">Retry</button>
                                 @endif
                                 @if($status->status === 'completed')
-                                    <a href="{{ route('sacco.dashboard', ['alias' => $status->alias]) }}" 
+                                    <a href="{{ route('sacco.dashboard', ['alias' => $status->alias]) }}"
                                        class="text-green-600 hover:text-green-900">View</a>
                                 @endif
                             </td>
@@ -143,4 +223,4 @@
             {{ $statuses->links() }}
         </div>
     </div>
-</div> 
+</div>
