@@ -209,16 +209,24 @@ private function configureApache(string $alias, string $targetPath): void
 
         // Use the instance's database connection
         foreach ($users as $user) {
-            DB::connection('instance')->table('users')->insert([
-                'name' => $user['name'],
-                'email' => $user['email'],
-                'password' => Hash::make($user['password']),
-                'created_at' => now(),
-                'updated_at' => now()
-            ]);
+            try {
+                DB::connection('instance')->table('users')->insertOrIgnore([
+                    'name' => $user['name'],
+                    'email' => $user['email'],
+                    'password' => Hash::make($user['password']),
+                    'created_at' => now(),
+                    'updated_at' => now()
+                ]);
 
-            // Send welcome email
-            $this->sendWelcomeEmail($user['email'], $user['password'], $alias);
+                // Send welcome email
+                $this->sendWelcomeEmail($user['email'], $user['password'], $alias);
+            } catch (Exception $e) {
+                Log::warning("Failed to create user, continuing with next user", [
+                    'email' => $user['email'],
+                    'error' => $e->getMessage()
+                ]);
+                continue;
+            }
         }
 
         Log::info("Default users created for {$alias}");
