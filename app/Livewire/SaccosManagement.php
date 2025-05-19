@@ -7,6 +7,7 @@ use Illuminate\Support\Str;
 use Livewire\WithPagination;
 use Livewire\Component;
 use App\Services\SaccoProvisioner;
+use App\Jobs\ProvisionSaccoJob;
 
 class SaccosManagement extends Component
 {
@@ -63,7 +64,7 @@ class SaccosManagement extends Component
     //     'it_phone_number' => 'nullable|string',
     // ];
 
-    
+
     public function rules()
     {
         return [
@@ -76,15 +77,15 @@ class SaccosManagement extends Component
         'institution_type' => 'required|string',
         // 'status' => 'required|string',
 
-        'alias' => 'required|string|unique:institutions,alias,' . ($this->editingId),
-        'db_name' => 'required|string|unique:institutions,db_name,' . ($this->editingId),
-        // 'db_host' => 'required|string',
-        'institution_id' => 'required|string|unique:institutions,institution_id,' . ($this->editingId),
+            'alias' => ['required', 'string', 'unique:institutions,alias' . ($this->editingId ? ",{$this->editingId}" : '')],
+            'db_name' => ['required', 'string', 'unique:institutions,db_name' . ($this->editingId ? ",{$this->editingId}" : '')],
+            'db_host' => 'required|string',
+            'institution_id' => ['required', 'string', 'unique:institutions,institution_id' . ($this->editingId ? ",{$this->editingId}" : '')],
 
-        'manager_email' => 'nullable|email',
-        'manager_phone_number' => 'nullable|string',
-        'it_email' => 'nullable|email',
-        'it_phone_number' => 'nullable|string',
+            'manager_email' => 'nullable|email',
+            'manager_phone_number' => 'nullable|string',
+            'it_email' => 'nullable|email',
+            'it_phone_number' => 'nullable|string',
         ];
     }
 

@@ -71,20 +71,10 @@
     </style>
 
     <div class="h-full">
-        <!-- Sidebar backdrop (mobile only) -->
-        <div class="fixed inset-0 bg-slate-900 bg-opacity-30 z-40 lg:hidden lg:z-auto transition-opacity duration-200"
-            :class="sidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'"
-            aria-hidden="true"
-            x-cloak
-        ></div>
+   
 
         <!-- Sidebar -->
         <div class="h-full overflow-y-auto lg:translate-x-0 mt-10"
-            :class="{'translate-x-0': sidebarOpen, '-translate-x-56': !sidebarOpen}"
-            @click.outside="sidebarOpen = false"
-            @keydown.escape.window="sidebarOpen = false"
-            x-data="{ sidebarOpen: true }"
-            x-cloak="lg"
         >
             <!-- Navigation -->
             <nav id="sidebar" class="px-2 py-3 space-y-0.5">

@@ -11,18 +11,32 @@ use Illuminate\Support\Facades\Mail;
 use PDO;
 use Exception;
 use Jackiedo\DotenvEditor\DotenvEditor;
+use Symfony\Component\Process\Process;
 
 
 class SaccoProvisioner
 {
     private $baseDir;
     private $instancesDir;
-    private $baseUrl = 'http://22.32.241.42';
+    private $baseUrl = 'http://172.240.241.180';
+    private $progressCallback;
 
     public function __construct()
     {
         $this->baseDir = dirname(base_path());
         $this->instancesDir = "{$this->baseDir}/instances";
+    }
+
+    public function setProgressCallback(callable $callback)
+    {
+        $this->progressCallback = $callback;
+    }
+
+    private function notifyProgress($step, $message, $data = [])
+    {
+        if ($this->progressCallback) {
+            call_user_func($this->progressCallback, $step, $message, $data);
+        }
     }
 
     private function copyDirectoryWithProgress(string $source, string $destination): void
@@ -101,66 +115,11 @@ class SaccoProvisioner
 
 private function configureApache(string $alias, string $targetPath): void
 {
-    $timestamp = now()->toDateTimeString();
-    $primaryDomain = "nbcsaccos.co.tz";
-    $instanceDomain = "{$alias}.{$primaryDomain}";
-
-    // Apache log paths
-    $logDir = "/var/log/httpd";
-    $accessLog = "{$logDir}/{$alias}-access.log";
-    $errorLog = "{$logDir}/{$alias}-error.log";
-
-    // Ensure log directory exists
-    if (!is_dir($logDir)) {
-        mkdir($logDir, 0755, true);
-    }
-
-    // Apache virtual host config (HTTP only)
-    $vhostConfig = <<<CONF
-<VirtualHost *:80>
-    ServerName {$instanceDomain}
-    DocumentRoot "{$targetPath}/public"
-
-    <Directory "{$targetPath}/public">
-        Options Indexes FollowSymLinks
-        AllowOverride All
-        Require all granted
-    </Directory>
-
-    ErrorLog "{$errorLog}"
-    CustomLog "{$accessLog}" combined
-</VirtualHost>
-CONF;
-
-    $vhostPath = "/etc/httpd/conf.d/{$alias}.conf";
-
     try {
-        Log::info("[{$timestamp}] Writing Apache vhost for '{$instanceDomain}' to '{$vhostPath}'");
-
-        // Write the config with elevated privileges
-        $tmpFile = sys_get_temp_dir() . "/vhost_{$alias}.conf";
-        file_put_contents($tmpFile, $vhostConfig);
-
-        $cmd = escapeshellcmd("sudo mv {$tmpFile} {$vhostPath}");
-        exec($cmd, $output, $returnCode);
-
-        if ($returnCode !== 0) {
-            $error = implode("\n", $output);
-            Log::error("[{$timestamp}] Failed to move Apache config for '{$instanceDomain}': {$error}");
-            throw new Exception("Failed to install Apache virtual host configuration.");
-        }
-
-        // Reload Apache
-        exec("sudo systemctl reload httpd", $reloadOutput, $reloadCode);
-        if ($reloadCode !== 0) {
-            $error = implode("\n", $reloadOutput);
-            Log::error("[{$timestamp}] Apache reload failed: {$error}");
-            throw new Exception("Failed to reload Apache.");
-        }
-
-        Log::info("[{$timestamp}] Apache configured and reloaded for '{$instanceDomain}'");
+        $apacheService = new ApacheConfigService();
+        $apacheService->configure($alias, $targetPath);
     } catch (Exception $e) {
-        Log::error("[{$timestamp}] Apache configuration failed: " . $e->getMessage());
+        Log::error("Apache configuration failed: " . $e->getMessage());
         throw $e;
     }
 }
@@ -279,7 +238,7 @@ CONF;
             $alias = Str::slug($alias);
             $dbName = Str::slug($dbName, '_');
 
-            Log::info("Starting provisioning process", [
+            $this->notifyProgress('started', 'Starting provisioning process', [
                 'alias' => $alias,
                 'database' => $dbName,
                 'host' => $dbHost
@@ -292,46 +251,43 @@ CONF;
             if (!File::exists($this->instancesDir)) {
                 File::makeDirectory($this->instancesDir, 0755, true);
                 exec("chmod -R 755 {$this->instancesDir}");
-                Log::info("Created directory: {$this->instancesDir}");
+                $this->notifyProgress('directory_created', 'Created instances directory');
             }
 
-            Log::info("Step 1: Cloning template");
+            $this->notifyProgress('cloning', 'Cloning template');
             $this->copyDirectoryWithProgress($baseTemplate, $targetPath);
 
-            Log::info("Step 2: Creating database");
+            $this->notifyProgress('database', 'Creating database');
             $this->createRemoteDatabase($dbHost, $dbName, $dbUser, $dbPassword);
 
-            Log::info("Step 3: Generating .env file");
+            $this->notifyProgress('env', 'Generating .env file');
             $this->generateEnvFile($targetPath, $dbName, $dbHost, $dbUser, $dbPassword, $alias);
 
-            Log::info("Step 4: Updating Livewire config");
+            $this->notifyProgress('livewire', 'Updating Livewire config');
             $this->updateLivewireConfig($targetPath, $alias);
 
-            Log::info("Step 5: Configuring Apache");
+            $this->notifyProgress('apache', 'Configuring Apache');
             $this->configureApache($alias, $targetPath);
 
-            Log::info("Step 6: Running post-installation commands");
+            $this->notifyProgress('post_install', 'Running post-installation commands');
             $this->runPostInstallationCommands($targetPath, $dbHost, $dbName, $dbUser, $dbPassword);
 
-            Log::info("Step 7: Creating default users");
+            $this->notifyProgress('users', 'Creating default users');
             $this->createDefaultUsers($targetPath, $alias, $managerEmail, $itEmail);
 
-            Log::info("Provisioning completed successfully", [
-                'alias' => $alias,
-                'path' => $targetPath,
-                'url' => "{$this->baseUrl}/{$alias}"
-            ]);
-
-            return [
+            $result = [
                 'success' => true,
                 'path' => $targetPath,
                 'alias' => $alias,
                 'url' => "{$this->baseUrl}/{$alias}"
             ];
 
+            $this->notifyProgress('completed', 'Provisioning completed successfully', $result);
+
+            return $result;
+
         } catch (Exception $e) {
-            Log::error("Provisioning failed", [
-                'alias' => $alias ?? 'unknown',
+            $this->notifyProgress('failed', 'Provisioning failed: ' . $e->getMessage(), [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
@@ -390,80 +346,100 @@ CONF;
     {
         Log::info("Starting post-installation commands", ['targetPath' => $targetPath]);
 
-        // Store original connection
+        // Store original connection and disconnect
         $originalConnection = config('database.default');
-        
+        DB::disconnect($originalConnection);
+
         try {
-            // Switch to the new database connection
+            // Configure and connect to temporary database
             config([
-                'database.connections.pgsql' => [
+                'database.connections.temp_connection' => [
                     'driver' => 'pgsql',
-                    'host' => '22.32.230.155',
-                    'port' => '5432',
+                    'url' => env('TEMP_DB_URL'),
+                    'host' => $dbHost,
+                    'port' => env('TEMP_DB_PORT', '5432'),
                     'database' => $dbName,
-                    'username' => 'postgres',
-                    'password' => 'postgres',
+                    'username' => $dbUser,
+                    'password' => $dbPassword,
+                    'charset' => env('TEMP_DB_CHARSET', 'utf8'),
+                    'prefix' => '',
+                    'prefix_indexes' => true,
+                    'search_path' => 'public',
+                    'sslmode' => 'prefer',
                 ]
             ]);
-            
-            // Set as default connection
-            config(['database.default' => 'pgsql']);
-            
-            // Clear connection cache
-            DB::purge('pgsql');
-            DB::reconnect('pgsql');
 
-            $commands = [
-                'composer install --no-interaction --optimize-autoloader',
-                'php artisan migrate:fresh --force --path=database/migrations',  // Specify migrations path
-                'php artisan db:seed',
-                //'npm install',
-                //'npm run build',
-                'chown -R www-data:www-data storage bootstrap/cache',
-                'chmod -R 775 storage bootstrap/cache'
-            ];
+            // Set as default connection and ensure it's connected
+            config(['database.default' => 'temp_connection']);
+            DB::purge('temp_connection');
+            DB::reconnect('temp_connection');
 
-            foreach ($commands as $command) {
-                Log::info("Executing command", [
-                    'command' => $command,
-                    'targetPath' => $targetPath
+            // Verify connection
+            try {
+                DB::connection('temp_connection')->getPdo();
+                Log::info("Successfully connected to temporary database", [
+                    'database' => $dbName,
+                    'host' => $dbHost
                 ]);
-
-                // Change to target directory before running command
-                $currentDir = getcwd();
-                chdir($targetPath);
-                
-                exec($command, $output, $returnCode);
-                
-                // Change back to original directory
-                chdir($currentDir);
-                
-                Log::info("Command execution result", [
-                    'command' => $command,
-                    'output' => $output,
-                    'returnCode' => $returnCode
-                ]);
-
-                if ($returnCode !== 0) {
-                    $errorOutput = implode("\n", $output);
-                    Log::error("Command failed", [
-                        'command' => $command,
-                        'output' => $errorOutput,
-                        'returnCode' => $returnCode
-                    ]);
-                    throw new Exception("Failed to execute command: {$command}. Error: {$errorOutput}");
-                }
-                Log::info("Successfully executed command", ['command' => $command]);
+            } catch (Exception $e) {
+                throw new Exception("Failed to connect to temporary database: " . $e->getMessage());
             }
-        } finally {
-            // Reset to original connection
-            config(['database.default' => $originalConnection]);
-            DB::purge('pgsql');
-            DB::reconnect($originalConnection);
-            
-            Log::info("Database connection reset to original", [
-                'originalConnection' => $originalConnection
+
+            // Change to target directory
+            $currentDir = getcwd();
+            chdir($targetPath);
+
+            // Run composer install
+            // $process = Process::fromShellCommandline('composer install --no-interaction --optimize-autoloader');
+            // $process->setTimeout(300);
+            // $process->mustRun();
+
+            // Run migrations using the temporary connection
+            $process = Process::fromShellCommandline('php artisan migrate:fresh --force --database=temp_connection');
+            $process->setTimeout(300);
+            $process->mustRun();
+
+            // Run seeders
+            $process = Process::fromShellCommandline('php artisan db:seed --database=temp_connection');
+            $process->setTimeout(300);
+            $process->mustRun();
+
+            // Set permissions
+            $process = Process::fromShellCommandline('chown -R apache:apache storage bootstrap/cache && chmod -R 775 storage bootstrap/cache');
+            $process->setTimeout(300);
+            $process->mustRun();
+
+            // Change back to original directory
+            chdir($currentDir);
+
+        } catch (Exception $e) {
+            Log::error("Error during post-installation commands", [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
             ]);
+            throw $e;
+        } finally {
+            // Clean up temporary connection
+            DB::disconnect('temp_connection');
+            DB::purge('temp_connection');
+
+            // Restore original connection
+            config(['database.default' => $originalConnection]);
+            DB::reconnect($originalConnection);
+
+            // Verify original connection is restored
+            try {
+                DB::connection($originalConnection)->getPdo();
+                Log::info("Successfully restored original database connection", [
+                    'connection' => $originalConnection
+                ]);
+            } catch (Exception $e) {
+                Log::error("Failed to restore original database connection", [
+                    'error' => $e->getMessage(),
+                    'connection' => $originalConnection
+                ]);
+                throw new Exception("Failed to restore original database connection: " . $e->getMessage());
+            }
         }
     }
 
@@ -503,6 +479,10 @@ CONF;
         Log::info("Attempting cleanup after failed provision", ['alias' => $alias]);
 
         try {
+            // Remove Apache configuration
+            $apacheService = new ApacheConfigService();
+            $apacheService->removeConfig($alias);
+
             // Remove instance directory if it exists
             if (File::exists($targetPath)) {
                 File::deleteDirectory($targetPath);
