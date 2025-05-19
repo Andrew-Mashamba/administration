@@ -6,7 +6,151 @@
                 @php use Illuminate\Support\Facades\DB; @endphp
                 <div>
 
+                    <!-- Institution Details Section -->
+                    <div class="w-full">
+                        <div class="flex items-center justify-center p-2 h-full">
+                            <div aria-label="card" class="p-6 rounded-3xl bg-white w-full h-full">
+                                <div aria-label="header" class="flex items-center space-x-2">
+                                    <svg data-slot="icon" class="w-8 h-8 shrink-0" width="24" height="24" viewBox="0 0 24 24" stroke-width="1.5" stroke="#43b02a" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21M3 3h12m-.75 4.5H21m-3.75 3.75h.008v.008h-.008v-.008zm0 3h.008v.008h-.008v-.008zm0 3h.008v.008h-.008v-.008z"></path>
+                                    </svg>
+                                    <div class="space-y-0.5 flex-1 cursor-pointer">
+                                        <h3 class="font-medium text-lg tracking-tight text-gray-900 leading-tight">
+                                            Institution Details
+                                        </h3>
+                                        <p class="text-sm font-medium text-gray-900 leading-none">
+                                            Overview of institution performance and key metrics
+                                        </p>
+                                    </div>
+                                </div>
 
+                                <div class="w-full flex gap-4 mt-8">
+                                    <!-- Total Institutions -->
+                                    <div class="w-1/4 bg-gray-100 p-1 rounded-3xl">
+                                        <div class="flex items-center justify-center h-full">
+                                            <div aria-label="card" class="p-6 rounded-3xl bg-white w-full h-full">
+                                                <div aria-label="header" class="flex items-center space-x-2">
+                                                    <svg data-slot="icon" class="w-8 h-8 shrink-0" width="24" height="24" viewBox="0 0 24 24" stroke-width="1.5" stroke="#43b02a" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21"></path>
+                                                    </svg>
+                                                    <div class="space-y-0.5 flex-1 cursor-pointer">
+                                                        <h3 class="font-medium text-lg tracking-tight text-gray-900 leading-tight">
+                                                            Total Institutions
+                                                        </h3>
+                                                        <p class="text-sm font-medium text-gray-900 leading-none">
+                                                            Total number of registered institutions
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <div aria-label="content" class="mt-9 grid gap-2.5">
+                                                    <p class="mb-2 text-3xl font-extrabold">{{ $totalInstitutions }}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Active Institutions -->
+                                    <div class="w-1/4 bg-gray-100 p-1 rounded-3xl">
+                                        <div class="flex items-center justify-center h-full">
+                                            <div aria-label="card" class="p-6 rounded-3xl bg-white w-full h-full">
+                                                <div aria-label="header" class="flex items-center space-x-2">
+                                                    <svg data-slot="icon" class="w-8 h-8 shrink-0" width="24" height="24" viewBox="0 0 24 24" stroke-width="1.5" stroke="#43b02a" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z"></path>
+                                                    </svg>
+                                                    <div class="space-y-0.5 flex-1 cursor-pointer">
+                                                        <h3 class="font-medium text-lg tracking-tight text-gray-900 leading-tight">
+                                                            Active Institutions
+                                                        </h3>
+                                                        <p class="text-sm font-medium text-gray-900 leading-none">
+                                                            Number of active institutions
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <div aria-label="content" class="mt-9 grid gap-2.5">
+                                                    <p class="mb-2 text-3xl font-extrabold">{{ $activeInstitutions }}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Microfinance Institutions -->
+                                    <div class="w-1/4 bg-gray-100 p-1 rounded-3xl">
+                                        <div class="flex items-center justify-center h-full">
+                                            <div aria-label="card" class="p-6 rounded-3xl bg-white w-full h-full">
+                                                <div aria-label="header" class="flex items-center space-x-2">
+                                                    <svg data-slot="icon" class="w-8 h-8 shrink-0" width="24" height="24" viewBox="0 0 24 24" stroke-width="1.5" stroke="#43b02a" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 20.25l6.75-6.75H4.5a2.25 2.25 0 0 1-2.25-2.25V6.75A2.25 2.25 0 0 1 4.5 4.5h15.75A2.25 2.25 0 0 1 22.5 6.75v8.25a2.25 2.25 0 0 1-2.25 2.25H9z"></path>
+                                                    </svg>
+                                                    <div class="space-y-0.5 flex-1 cursor-pointer">
+                                                        <h3 class="font-medium text-lg tracking-tight text-gray-900 leading-tight">
+                                                            Microfinance Institutions
+                                                        </h3>
+                                                        <p class="text-sm font-medium text-gray-900 leading-none">
+                                                            Total microfinance institutions
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <div aria-label="content" class="mt-9 grid gap-2.5">
+                                                    <p class="mb-2 text-3xl font-extrabold">{{ $microfinanceInstitutions }}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- SACCO Institutions -->
+                                    <div class="w-1/4 bg-gray-100 p-1 rounded-3xl">
+                                        <div class="flex items-center justify-center h-full">
+                                            <div aria-label="card" class="p-6 rounded-3xl bg-white w-full h-full">
+                                                <div aria-label="header" class="flex items-center space-x-2">
+                                                    <svg data-slot="icon" class="w-8 h-8 shrink-0" width="24" height="24" viewBox="0 0 24 24" stroke-width="1.5" stroke="#43b02a" fill="none" stroke-linecap="round" stroke-linejoin="round">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5"></path>
+                                                    </svg>
+                                                    <div class="space-y-0.5 flex-1 cursor-pointer">
+                                                        <h3 class="font-medium text-lg tracking-tight text-gray-900 leading-tight">
+                                                            SACCO Institutions
+                                                        </h3>
+                                                        <p class="text-sm font-medium text-gray-900 leading-none">
+                                                            Total SACCO institutions
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <div aria-label="content" class="mt-9 grid gap-2.5">
+                                                    <p class="mb-2 text-3xl font-extrabold">{{ $saccoInstitutions }}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Charts Section -->
+                    <div class="w-full mt-8">
+                        <div class="flex items-center justify-center p-2 h-full">
+                            <div aria-label="card" class="p-6 rounded-3xl bg-white w-full h-full">
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    <!-- Institution Type Distribution -->
+                                    <div class="bg-gray-100 p-4 rounded-3xl">
+                                        <h3 class="text-lg font-medium mb-4">Institution Type Distribution</h3>
+                                        <div id="institutionStatusChart"></div>
+                                    </div>
+
+                                    <!-- Active vs Inactive Comparison -->
+                                    <div class="bg-gray-100 p-4 rounded-3xl">
+                                        <h3 class="text-lg font-medium mb-4">Active vs Inactive Institutions</h3>
+                                        <div id="activeInactiveChart"></div>
+                                    </div>
+
+                                    <!-- Detailed Status Breakdown -->
+                                    <div class="bg-gray-100 p-4 rounded-3xl md:col-span-2">
+                                        <h3 class="text-lg font-medium mb-4">Detailed Status Breakdown</h3>
+                                        <div id="statusBreakdownChart"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
                     <!-- dashboard 0 -->
                     <div class="w-full">
@@ -1742,10 +1886,11 @@
         </div>
     </div>
 
-    <script src="{{ asset('js/lib/apexcharts.min.js') }}"></script>
-
+    
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+    
     <!-- //dashboard 1 scripts -->
-    <script>
+   {{-- <script>
         document.addEventListener("DOMContentLoaded", function () {
             // **Radial Bar Chart - Collection Rate**
             var radialBarChartOptions = {
@@ -2638,9 +2783,46 @@
 
             new ApexCharts(document.querySelector("#dash10vintageChart"), options).render();
         });
-    </script>
+    </script> --}}
 
+   
+    <script>
+    
+        //document.addEventListener('DOMContentLoaded', function () {
+        var options = {
+            chart: {
+                type: 'donut',
+                height: 250,
+                width : '95%'
+            },           
 
+            series: [
+                {{ $data['totalInstitutions'] }},
+                {{ $data['activeInstitutions'] }},
+                {{ $data['inactiveInstitutions'] }},                
+            ],
+            labels: [
+                'Total',
+                'Active',
+                'Inactive',
+            ],
+            colors: [
+                '#71dd37',  // Pending (Bright Green)
+                '#1EA24A',  // Analysis (Dark Green)
+                '#4CAF50',  // Offered (Medium Green)
+                //'#81C784',  // Accepted (Light Green)
+                //'#388E3C',  // Declined (Forest Green)
+            ],
+            title: {
+                text: 'Institution Status Summary'
+            }
+        };
 
+        var chart = new ApexCharts(document.querySelector("#institutionStatusChart"), options);
+        chart.render();
+        //});
+    
+</script>
+   
 
 </div>

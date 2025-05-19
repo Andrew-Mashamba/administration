@@ -15,6 +15,10 @@
         <!-- Scripts -->
         @vite(['resources/css/app.css', 'resources/js/app.js'])
 
+        <!-- apexcharts -->
+        {{--<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>--}}
+        <script src="{{ asset('js/lib/apexcharts.js') }}"></script> 
+
         {{--<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>--}}
 
         <!-- Styles -->
