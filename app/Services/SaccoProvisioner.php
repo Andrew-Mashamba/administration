@@ -405,6 +405,7 @@ private function configureApache(string $alias, string $targetPath): void
 
 return [
     'default' => 'pgsql',
+    'migrations' => 'migrations',
     'connections' => [
         'pgsql' => [
             'driver' => 'pgsql',
@@ -418,21 +419,53 @@ return [
             'prefix_indexes' => true,
             'search_path' => 'public',
             'sslmode' => 'prefer',
+            'migrations' => 'migrations',
         ],
     ],
 ];
 PHP;
             file_put_contents($tempConfigPath, $configContent);
 
-            // Run migrations
-            $process = new Process(['php', 'artisan', 'migrate:fresh', '--force']);
+            // Create a temporary .env file for the artisan command
+            $tempEnvPath = "{$targetPath}/.env.temp";
+            $envContent = <<<ENV
+APP_NAME=Laravel
+APP_ENV=local
+APP_KEY=base64:your-app-key-here
+APP_DEBUG=true
+APP_URL=http://localhost
+
+LOG_CHANNEL=stack
+LOG_DEPRECATIONS_CHANNEL=null
+LOG_LEVEL=debug
+
+DB_CONNECTION=pgsql
+DB_HOST={$dbHost}
+DB_PORT=5432
+DB_DATABASE={$dbName}
+DB_USERNAME={$dbUser}
+DB_PASSWORD={$dbPassword}
+
+BROADCAST_DRIVER=log
+CACHE_DRIVER=file
+FILESYSTEM_DISK=local
+QUEUE_CONNECTION=sync
+SESSION_DRIVER=file
+SESSION_LIFETIME=120
+ENV;
+            file_put_contents($tempEnvPath, $envContent);
+
+            // Run migrations with the temporary .env file
+            $process = new Process(['php', 'artisan', 'migrate:fresh', '--force', '--env=local']);
             $process->setWorkingDirectory($targetPath);
+            $process->setEnv(['APP_ENV' => 'local']);
             $process->setTimeout(300);
             $process->mustRun();
 
             // Run seeders
-            $process = new Process(['php', 'artisan', 'db:seed']);
+            $process = new Process(['php', 'artisan', 'db:seed', '--env=local']);
             $process->setWorkingDirectory($targetPath);
+            $process->setEnv(['APP_ENV' => 'local']);
             $process->setTimeout(300);
             $process->mustRun();
 
@@ -447,8 +480,9 @@ PHP;
             $process->setTimeout(300);
             $process->mustRun();
 
-            // Clean up temporary config
+            // Clean up temporary files
             unlink($tempConfigPath);
+            unlink($tempEnvPath);
 
             // Restore original connection
             config(['database.default' => $originalConnection]);
