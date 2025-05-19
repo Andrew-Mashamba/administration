@@ -50,7 +50,17 @@ class ProvisionSaccoJob implements ShouldQueue
             throw new \Exception('Another provisioning process is already in progress.');
         }
 
-        $status = ProvisioningStatus::markStarted($this->alias);
+        $status = ProvisioningStatus::create([
+            'alias' => $this->alias,
+            'status' => 'in_progress',
+            'started_at' => now(),
+            'db_name' => $this->dbName,
+            'db_host' => $this->dbHost,
+            'db_user' => $this->dbUser,
+            'db_password' => $this->dbPassword,
+            'manager_email' => $this->managerEmail,
+            'it_email' => $this->itEmail
+        ]);
 
         try {
             $provisioner = new SaccoProvisioner();

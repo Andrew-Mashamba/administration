@@ -15,6 +15,12 @@ return new class extends Migration
             $table->string('step')->nullable();
             $table->text('message')->nullable();
             $table->json('data')->nullable();
+            $table->string('db_name')->nullable();
+            $table->string('db_host')->nullable();
+            $table->string('db_user')->nullable();
+            $table->string('db_password')->nullable();
+            $table->string('manager_email')->nullable();
+            $table->string('it_email')->nullable();
             $table->timestamp('started_at');
             $table->timestamp('completed_at')->nullable();
             $table->timestamps();
