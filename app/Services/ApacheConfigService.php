@@ -78,7 +78,7 @@ class ApacheConfigService
             ]);
 
         } catch (Exception $e) {
-            Log::error("Apache configuration failed", [
+            Log::error("Apache configuration failed xxxxxxxxxxxxxxxxxxx", [
                 'error' => $e->getMessage(),
                 'alias' => $alias,
                 'target_path' => $targetPath

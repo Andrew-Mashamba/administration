@@ -149,16 +149,16 @@ private function configureApache(string $alias, string $targetPath): void
             throw new Exception("Target path does not exist: {$targetPath}");
         }
 
-        // $apacheService = new ApacheConfigService();
-        // $apacheService->configure($alias, $targetPath);
+        $apacheService = new ApacheConfigService();
+        $apacheService->configure($alias, $targetPath);
 
     } catch (Exception $e) {
-        Log::error("Apache configuration failed", [
+        Log::error("Apache configuration failed yyyyyyyyyyyyyy", [
             'error' => $e->getMessage(),
             'alias' => $alias,
             'target_path' => $targetPath
         ]);
-        throw new Exception("Apache configuration failed: " . $e->getMessage());
+        throw new Exception("Apache configuration failed bbbbbbbbbbbbbbb: " . $e->getMessage());
     }
 }
 
