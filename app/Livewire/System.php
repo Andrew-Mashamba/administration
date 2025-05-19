@@ -23,7 +23,7 @@ class System extends Component
     public function mount()
     {
         $this->initializeMenu();
-        $this->checkUserStatus();
+        //$this->checkUserStatus();
     }
 
     protected function initializeMenu()
@@ -64,7 +64,7 @@ class System extends Component
     public function refreshMenuState()
     {
         $this->initializeMenu();
-        $this->checkUserStatus();
+        //$this->checkUserStatus();
     }
 
     public function render()
