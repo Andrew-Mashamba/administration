@@ -6,6 +6,9 @@ use Illuminate\Support\ServiceProvider;
 use Livewire\Livewire;
 use App\Livewire\NavigationMenu;
 use App\Livewire\Dashboard;
+use App\Livewire\SideBar;
+use App\Livewire\Users;
+use App\Livewire\Settings;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -24,6 +27,9 @@ class AppServiceProvider extends ServiceProvider
     {
         Livewire::component('navigation-menu', NavigationMenu::class);
         Livewire::component('dashboard', Dashboard::class);
+        Livewire::component('side-bar', SideBar::class);
+        Livewire::component('users', Users::class);
+        Livewire::component('settings', Settings::class);
 
         \Livewire\Livewire::setUpdateRoute(function ($handle) {
             return \Illuminate\Support\Facades\Route::post('/livewire/update', $handle);

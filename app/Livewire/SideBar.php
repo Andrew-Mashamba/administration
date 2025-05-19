@@ -15,7 +15,10 @@ class SideBar extends Component
 
     public function mount()
     {     
-        $this->menuItems = Menu::where('system_id', 1)->get(['id', 'menu_name'])->toArray();
+        $this->menuItems = Menu::where('system_id', 1)
+            ->orderBy('menu_number')
+            ->get(['id', 'menu_name', 'menu_number'])
+            ->toArray();
         
         // Get the current route name to determine initial tab
         $routeName = request()->route()->getName();
@@ -25,6 +28,8 @@ class SideBar extends Component
             $this->tab_id = 2;
         } elseif (str_contains($routeName, 'institutions')) {
             $this->tab_id = 3;
+        } elseif (str_contains($routeName, 'settings')) {
+            $this->tab_id = 4;
         }
     }
 

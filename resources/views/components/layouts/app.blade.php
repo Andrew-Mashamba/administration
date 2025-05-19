@@ -18,19 +18,29 @@
     <div class="min-h-screen bg-gray-100">
         <livewire:navigation-menu />
 
-        <!-- Page Heading -->
-        @if (isset($header))
-            <header class="bg-white shadow">
-                <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
-                    {{ $header }}
-                </div>
-            </header>
-        @endif
+        <div class="flex">
+            <!-- Sidebar -->
+            <div class="w-64 min-h-screen bg-white shadow-lg">
+                <livewire:side-bar />
+            </div>
 
-        <!-- Page Content -->
-        <main>
-            {{ $slot }}
-        </main>
+            <!-- Main Content -->
+            <div class="flex-1">
+                <!-- Page Heading -->
+                @if (isset($header))
+                    <header class="bg-white shadow">
+                        <div class="max-w-7xl mx-auto py-6 px-4 sm:px-6 lg:px-8">
+                            {{ $header }}
+                        </div>
+                    </header>
+                @endif
+
+                <!-- Page Content -->
+                <main>
+                    {{ $slot }}
+                </main>
+            </div>
+        </div>
     </div>
 
     @stack('modals')
