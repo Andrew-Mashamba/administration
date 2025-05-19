@@ -48,18 +48,8 @@ class System extends Component
     protected function checkUserStatus()
     {
         $user = Auth::user();
-        if ($user) {
-            // Update verification status
-            DB::table('users')->where('id', $user->id)->update(['verification_status' => 0]);
-
-            // Get user status
-            $userStatus = $user->status;
-
-            // Set menu_id based on user status
-            if (in_array($userStatus, ['PENDING', 'BLOCKED', 'DELETED'])) {
-                $this->menu_id = 9;
-                $this->tab_id = 9;
-            }
+        if (!$user || !$user->is_active) {
+            $this->menu_id = 9; // Error state
         }
     }
 
@@ -80,7 +70,7 @@ class System extends Component
     public function render()
     {
         return view('livewire.system', [
-            'menuItems' => $this->menuItems
+            'layout' => 'components.layouts.app'
         ]);
     }
 }
