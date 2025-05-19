@@ -13,8 +13,8 @@ class ApacheConfigService
 
     public function __construct()
     {
-        $this->apacheConfigDir = '/etc/apache2/sites-available';
-        $this->apacheSitesDir = '/etc/apache2/sites-enabled';
+        $this->apacheConfigDir = '/etc/httpd/conf.d';
+        $this->apacheSitesDir = '/etc/httpd/conf.d';
     }
 
     public function configure(string $alias, string $targetPath): void
@@ -30,10 +30,6 @@ class ApacheConfigService
                 throw new Exception("Apache configuration directory does not exist: {$this->apacheConfigDir}");
             }
 
-            if (!File::exists($this->apacheSitesDir)) {
-                throw new Exception("Apache sites directory does not exist: {$this->apacheSitesDir}");
-            }
-
             // Create Apache configuration
             $configContent = $this->generateApacheConfig($alias, $targetPath);
             $configPath = "{$this->apacheConfigDir}/{$alias}.conf";
@@ -43,26 +39,16 @@ class ApacheConfigService
                 throw new Exception("Failed to write Apache configuration file");
             }
 
-            // Create symbolic link in sites-enabled
-            $enabledPath = "{$this->apacheSitesDir}/{$alias}.conf";
-            if (File::exists($enabledPath)) {
-                File::delete($enabledPath);
-            }
-
-            if (!symlink($configPath, $enabledPath)) {
-                throw new Exception("Failed to create symbolic link for site configuration");
-            }
-
             // Test Apache configuration
             $output = [];
             $returnCode = 0;
-            exec('apache2ctl -t 2>&1', $output, $returnCode);
+            exec('apachectl -t 2>&1', $output, $returnCode);
             if ($returnCode !== 0) {
                 throw new Exception("Apache configuration test failed: " . implode("\n", $output));
             }
 
             // Reload Apache
-            exec('systemctl reload apache2 2>&1', $output, $returnCode);
+            exec('systemctl reload httpd 2>&1', $output, $returnCode);
             if ($returnCode !== 0) {
                 throw new Exception("Failed to reload Apache: " . implode("\n", $output));
             }
@@ -99,7 +85,7 @@ class ApacheConfigService
             }
 
             // Reload Apache
-            exec('systemctl reload apache2', $output, $returnCode);
+            exec('systemctl reload httpd', $output, $returnCode);
             if ($returnCode !== 0) {
                 throw new Exception("Failed to reload Apache after removing configuration");
             }
