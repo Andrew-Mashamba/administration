@@ -116,11 +116,21 @@ class SaccoProvisioner
 private function configureApache(string $alias, string $targetPath): void
 {
     try {
+        // Ensure the target path exists
+        if (!File::exists($targetPath)) {
+            throw new Exception("Target path does not exist: {$targetPath}");
+        }
+
         $apacheService = new ApacheConfigService();
         $apacheService->configure($alias, $targetPath);
+
     } catch (Exception $e) {
-        Log::error("Apache configuration failed: " . $e->getMessage());
-        throw $e;
+        Log::error("Apache configuration failed", [
+            'error' => $e->getMessage(),
+            'alias' => $alias,
+            'target_path' => $targetPath
+        ]);
+        throw new Exception("Apache configuration failed: " . $e->getMessage());
     }
 }
 
