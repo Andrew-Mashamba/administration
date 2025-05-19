@@ -34,21 +34,42 @@ class ApacheConfigService
             $configContent = $this->generateApacheConfig($alias, $targetPath);
             $configPath = "{$this->apacheConfigDir}/{$alias}.conf";
 
-            // Write configuration file
-            if (!File::put($configPath, $configContent)) {
-                throw new Exception("Failed to write Apache configuration file");
+            // Write configuration file using sudo
+            $tempFile = tempnam(sys_get_temp_dir(), 'apache_');
+            if (!File::put($tempFile, $configContent)) {
+                throw new Exception("Failed to write temporary configuration file");
+            }
+
+            // Move the file to Apache config directory using sudo
+            $command = sprintf('sudo mv %s %s', 
+                escapeshellarg($tempFile), 
+                escapeshellarg($configPath)
+            );
+            exec($command, $output, $returnCode);
+            if ($returnCode !== 0) {
+                throw new Exception("Failed to move Apache configuration file: " . implode("\n", $output));
+            }
+
+            // Set proper permissions
+            $command = sprintf('sudo chown root:root %s && sudo chmod 644 %s',
+                escapeshellarg($configPath),
+                escapeshellarg($configPath)
+            );
+            exec($command, $output, $returnCode);
+            if ($returnCode !== 0) {
+                throw new Exception("Failed to set Apache configuration file permissions: " . implode("\n", $output));
             }
 
             // Test Apache configuration
             $output = [];
             $returnCode = 0;
-            exec('apachectl -t 2>&1', $output, $returnCode);
+            exec('sudo apachectl -t 2>&1', $output, $returnCode);
             if ($returnCode !== 0) {
                 throw new Exception("Apache configuration test failed: " . implode("\n", $output));
             }
 
             // Reload Apache
-            exec('systemctl reload httpd 2>&1', $output, $returnCode);
+            exec('sudo systemctl reload httpd 2>&1', $output, $returnCode);
             if ($returnCode !== 0) {
                 throw new Exception("Failed to reload Apache: " . implode("\n", $output));
             }
@@ -72,22 +93,20 @@ class ApacheConfigService
     {
         try {
             $configPath = "{$this->apacheConfigDir}/{$alias}.conf";
-            $enabledPath = "{$this->apacheSitesDir}/{$alias}.conf";
 
-            // Remove symbolic link
-            if (File::exists($enabledPath)) {
-                File::delete($enabledPath);
-            }
-
-            // Remove configuration file
+            // Remove configuration file using sudo
             if (File::exists($configPath)) {
-                File::delete($configPath);
+                $command = sprintf('sudo rm %s', escapeshellarg($configPath));
+                exec($command, $output, $returnCode);
+                if ($returnCode !== 0) {
+                    throw new Exception("Failed to remove Apache configuration file: " . implode("\n", $output));
+                }
             }
 
             // Reload Apache
-            exec('systemctl reload httpd', $output, $returnCode);
+            exec('sudo systemctl reload httpd 2>&1', $output, $returnCode);
             if ($returnCode !== 0) {
-                throw new Exception("Failed to reload Apache after removing configuration");
+                throw new Exception("Failed to reload Apache after removing configuration: " . implode("\n", $output));
             }
 
             Log::info("Apache configuration removed successfully", [
