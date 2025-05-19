@@ -50,7 +50,7 @@ class System extends Component
         $user = Auth::user();
         if ($user) {
             // Update verification status
-            DB::table('users')->where('id', $user->id)->update(['verification_status' => 0]);
+            // DB::table('users')->where('id', $user->id)->update(['email_verified_at' => now()]);
 
             // Get user status
             $userStatus = $user->status;
