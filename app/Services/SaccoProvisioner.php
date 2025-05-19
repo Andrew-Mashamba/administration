@@ -236,14 +236,15 @@ private function configureApache(string $alias, string $targetPath): void
     {
         $url = "{$this->baseUrl}/{$alias}";
         $instanceDomain = "{$alias}.zima-uat.site";
+        $name = explode('@', $email)[0]; // Extract name from email
 
         try {
             Mail::to($email)
                 ->queue(new \App\Mail\WelcomeEmail([
                     'email' => $email,
                     'password' => $password,
-                    'url' => "http://{$instanceDomain}",
-                    'name' => explode('@', $email)[0] // Extract name from email
+                    'url' => "https://{$instanceDomain}",
+                    'name' => $name
                 ]));
 
             Log::info("Welcome email queued for {$email}");
@@ -262,7 +263,7 @@ private function configureApache(string $alias, string $targetPath): void
                     'email' => $email,
                     'password' => $password,
                     'url' => "https://{$instanceDomain}",
-                    'name' => explode('@', $email)[0]
+                    'name' => $name
                 ]),
                 'error' => $e->getMessage(),
                 'created_at' => now(),
