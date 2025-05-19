@@ -5,16 +5,19 @@ namespace App\Services;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use Exception;
+use Symfony\Component\Process\Process;
 
 class ApacheConfigService
 {
     private $apacheConfigDir;
     private $apacheSitesDir;
+    private $workingDir;
 
     public function __construct()
     {
         $this->apacheConfigDir = '/etc/httpd/conf.d';
         $this->apacheSitesDir = '/etc/httpd/conf.d';
+        $this->workingDir = '/var/www/html';
     }
 
     public function configure(string $alias, string $targetPath): void
@@ -41,38 +44,33 @@ class ApacheConfigService
             }
 
             // Move the file to Apache config directory using sudo
-            $command = sprintf('sudo mv %s %s', 
-                escapeshellarg($tempFile), 
-                escapeshellarg($configPath)
-            );
-            exec($command, $output, $returnCode);
-            if ($returnCode !== 0) {
-                throw new Exception("Failed to move Apache configuration file: " . implode("\n", $output));
-            }
+            $process = new Process(['sudo', 'mv', $tempFile, $configPath]);
+            $process->setWorkingDirectory($this->workingDir);
+            $process->setTimeout(30);
+            $process->mustRun();
 
             // Set proper permissions
-            $command = sprintf('sudo chown root:root %s && sudo chmod 644 %s',
-                escapeshellarg($configPath),
-                escapeshellarg($configPath)
-            );
-            exec($command, $output, $returnCode);
-            if ($returnCode !== 0) {
-                throw new Exception("Failed to set Apache configuration file permissions: " . implode("\n", $output));
-            }
+            $process = new Process(['sudo', 'chown', 'root:root', $configPath]);
+            $process->setWorkingDirectory($this->workingDir);
+            $process->setTimeout(30);
+            $process->mustRun();
+
+            $process = new Process(['sudo', 'chmod', '644', $configPath]);
+            $process->setWorkingDirectory($this->workingDir);
+            $process->setTimeout(30);
+            $process->mustRun();
 
             // Test Apache configuration
-            $output = [];
-            $returnCode = 0;
-            exec('sudo apachectl -t 2>&1', $output, $returnCode);
-            if ($returnCode !== 0) {
-                throw new Exception("Apache configuration test failed: " . implode("\n", $output));
-            }
+            $process = new Process(['sudo', 'apachectl', '-t']);
+            $process->setWorkingDirectory($this->workingDir);
+            $process->setTimeout(30);
+            $process->mustRun();
 
             // Reload Apache
-            exec('sudo systemctl reload httpd 2>&1', $output, $returnCode);
-            if ($returnCode !== 0) {
-                throw new Exception("Failed to reload Apache: " . implode("\n", $output));
-            }
+            $process = new Process(['sudo', 'systemctl', 'reload', 'httpd']);
+            $process->setWorkingDirectory($this->workingDir);
+            $process->setTimeout(30);
+            $process->mustRun();
 
             Log::info("Apache configuration completed successfully", [
                 'alias' => $alias,
@@ -96,18 +94,17 @@ class ApacheConfigService
 
             // Remove configuration file using sudo
             if (File::exists($configPath)) {
-                $command = sprintf('sudo rm %s', escapeshellarg($configPath));
-                exec($command, $output, $returnCode);
-                if ($returnCode !== 0) {
-                    throw new Exception("Failed to remove Apache configuration file: " . implode("\n", $output));
-                }
+                $process = new Process(['sudo', 'rm', $configPath]);
+                $process->setWorkingDirectory($this->workingDir);
+                $process->setTimeout(30);
+                $process->mustRun();
             }
 
             // Reload Apache
-            exec('sudo systemctl reload httpd 2>&1', $output, $returnCode);
-            if ($returnCode !== 0) {
-                throw new Exception("Failed to reload Apache after removing configuration: " . implode("\n", $output));
-            }
+            $process = new Process(['sudo', 'systemctl', 'reload', 'httpd']);
+            $process->setWorkingDirectory($this->workingDir);
+            $process->setTimeout(30);
+            $process->mustRun();
 
             Log::info("Apache configuration removed successfully", [
                 'alias' => $alias
