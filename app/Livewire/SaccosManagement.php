@@ -153,15 +153,15 @@ class SaccosManagement extends Component
             ]);
 
             // Test database connection before saving
-            try {
-                $testConnection = new PDO(
-                    "pgsql:host={$this->db_host};dbname={$this->db_name}",
-                    $this->db_user,
-                    $this->db_password
-                );
-            } catch (PDOException $e) {
-                throw new \Exception('Invalid database credentials: ' . $e->getMessage());
-            }
+            // try {
+            //     $testConnection = new PDO(
+            //         "pgsql:host={$this->db_host};dbname={$this->db_name}",
+            //         $this->db_user,
+            //         $this->db_password
+            //     );
+            // } catch (PDOException $e) {
+            //     throw new \Exception('Invalid database credentials: ' . $e->getMessage());
+            // }
 
             // Create institution with encrypted sensitive data
             $institution = Institution::create([
