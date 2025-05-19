@@ -322,6 +322,8 @@ private function configureApache(string $alias, string $targetPath): void
             'DB_DATABASE' => $dbName,
             'DB_USERNAME' => $dbUser,
             'DB_PASSWORD' => $dbPassword,
+            'DB_SCHEMA' => 'public',
+            'DB_SSL_MODE' => 'prefer',
         ]);
 
         // Set application configuration
@@ -355,13 +357,12 @@ private function configureApache(string $alias, string $targetPath): void
             config([
                 'database.connections.temp_connection' => [
                     'driver' => 'pgsql',
-                    'url' => env('TEMP_DB_URL'),
                     'host' => $dbHost,
-                    'port' => env('TEMP_DB_PORT', '5432'),
+                    'port' => '5432',
                     'database' => $dbName,
                     'username' => $dbUser,
                     'password' => $dbPassword,
-                    'charset' => env('TEMP_DB_CHARSET', 'utf8'),
+                    'charset' => 'utf8',
                     'prefix' => '',
                     'prefix_indexes' => true,
                     'search_path' => 'public',
@@ -389,11 +390,6 @@ private function configureApache(string $alias, string $targetPath): void
             $currentDir = getcwd();
             chdir($targetPath);
 
-            // Run composer install
-            // $process = Process::fromShellCommandline('composer install --no-interaction --optimize-autoloader');
-            // $process->setTimeout(300);
-            // $process->mustRun();
-
             // Run migrations using the temporary connection
             $process = Process::fromShellCommandline('php artisan migrate:fresh --force --database=temp_connection');
             $process->setTimeout(300);
@@ -412,34 +408,17 @@ private function configureApache(string $alias, string $targetPath): void
             // Change back to original directory
             chdir($currentDir);
 
+            // Restore original connection
+            config(['database.default' => $originalConnection]);
+            DB::purge('temp_connection');
+            DB::reconnect($originalConnection);
+
         } catch (Exception $e) {
             Log::error("Error during post-installation commands", [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
             throw $e;
-        } finally {
-            // Clean up temporary connection
-            DB::disconnect('temp_connection');
-            DB::purge('temp_connection');
-
-            // Restore original connection
-            config(['database.default' => $originalConnection]);
-            DB::reconnect($originalConnection);
-
-            // Verify original connection is restored
-            try {
-                DB::connection($originalConnection)->getPdo();
-                Log::info("Successfully restored original database connection", [
-                    'connection' => $originalConnection
-                ]);
-            } catch (Exception $e) {
-                Log::error("Failed to restore original database connection", [
-                    'error' => $e->getMessage(),
-                    'connection' => $originalConnection
-                ]);
-                throw new Exception("Failed to restore original database connection: " . $e->getMessage());
-            }
         }
     }
 
