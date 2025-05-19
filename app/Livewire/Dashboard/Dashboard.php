@@ -15,7 +15,7 @@ class Dashboard extends Component
     public $activeSaccoInstitutions;
     public $inactiveMicrofinanceInstitutions;
     public $inactiveSaccoInstitutions;
-    public $data;
+    public $data = [];
     public $menu_id = 1;
     public $tab_id = 1;
     protected $listeners = ['menuItemClicked'];
@@ -25,18 +25,34 @@ class Dashboard extends Component
    
        public function mount()
     {
-        $this->data = [
-            'totalInstitutions' => Institution::count(),
-            'activeInstitutions' => Institution::where('status', 'active')->count(),
-            'inactiveInstitutions' => Institution::where('status', 'inactive')->count(),
-            'microfinanceInstitutions' => Institution::where('institution_type', 'microfinance')->count(),
-            'saccoInstitutions' => Institution::where('institution_type', 'saccos')->count(),
-            'activeMicrofinanceInstitutions' => Institution::where('institution_type', 'microfinance')->where('status', 'active')->count(),
-            'activeSaccoInstitutions' => Institution::where('institution_type', 'saccos')->where('status', 'active')->count(),
-            'inactiveMicrofinanceInstitutions' => Institution::where('institution_type', 'microfinance')->where('status', 'inactive')->count(),
-            'inactiveSaccoInstitutions' => Institution::where('institution_type', 'saccos')->where('status', 'inactive')->count(),
-        ];    
-   }
+        $this->data = $this->institutionsCount();    
+    }
+
+    public function institutionsCount()
+    {
+            $totalInstitutions = Institution::count();
+            $activeInstitutions = Institution::where('status', 'active')->count();
+            $inactiveInstitutions = Institution::where('status', 'inactive')->count();
+            $microfinanceInstitutions = Institution::where('institution_type', 'microfinance')->count();
+            $saccoInstitutions = Institution::where('institution_type', 'saccos')->count();
+            $activeMicrofinanceInstitutions = Institution::where('institution_type', 'microfinance')->where('status', 'active')->count();
+            $activeSaccoInstitutions = Institution::where('institution_type', 'saccos')->where('status', 'active')->count();
+            $inactiveMicrofinanceInstitutions = Institution::where('institution_type', 'microfinance')->where('status', 'inactive')->count();
+            $inactiveSaccoInstitutions = Institution::where('institution_type', 'saccos')->where('status', 'inactive')->count();
+
+            return [
+                'totalInstitutions' => $totalInstitutions,
+                'activeInstitutions' => $activeInstitutions,
+                'inactiveInstitutions' => $inactiveInstitutions,
+                'microfinanceInstitutions' => $microfinanceInstitutions,
+                'saccoInstitutions' => $saccoInstitutions,
+                'activeMicrofinanceInstitutions' => $activeMicrofinanceInstitutions,
+                'activeSaccoInstitutions' => $activeSaccoInstitutions,
+                'inactiveMicrofinanceInstitutions' => $inactiveMicrofinanceInstitutions,
+                'inactiveSaccoInstitutions' => $inactiveSaccoInstitutions,
+            ];
+        
+    }
     
 
     public function menuItemClicked($item)
