@@ -197,7 +197,7 @@ class ProvisioningStatus extends Component
                 'step' => 'initializing',
                 'message' => 'Retrying provisioning...',
                 'data' => null,
-                'started_at' => null,
+                'started_at' => now(),
                 'completed_at' => null
             ]);
 
