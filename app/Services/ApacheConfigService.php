@@ -23,15 +23,15 @@ class ApacheConfigService
     public function configure(string $alias, string $targetPath): void
     {
         try {
-            // Validate paths
-            if (!File::exists($targetPath)) {
-                throw new Exception("Target path does not exist: {$targetPath}");
-            }
+            // // Validate paths
+            // if (!File::exists($targetPath)) {
+            //     throw new Exception("Target path does not exist: {$targetPath}");
+            // }
 
-            // Ensure Apache directories exist
-            if (!File::exists($this->apacheConfigDir)) {
-                throw new Exception("Apache configuration directory does not exist: {$this->apacheConfigDir}");
-            }
+            // // Ensure Apache directories exist
+            // if (!File::exists($this->apacheConfigDir)) {
+            //     throw new Exception("Apache configuration directory does not exist: {$this->apacheConfigDir}");
+            // }
 
             // // Create Apache configuration
             // $configContent = $this->generateApacheConfig($alias, $targetPath);
