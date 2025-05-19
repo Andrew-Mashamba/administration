@@ -44,25 +44,44 @@ class SaccoProvisioner
         set_time_limit(0);
         Log::info("Starting directory copy from {$source} to {$destination}");
 
+        // Ensure source exists
         if (!File::exists($source)) {
             throw new Exception("Source directory not found: {$source}");
         }
 
+        // Ensure destination exists with proper permissions
         if (!File::exists($destination)) {
-            File::makeDirectory($destination, 0755, true);
+            if (!File::makeDirectory($destination, 0755, true)) {
+                throw new Exception("Failed to create destination directory: {$destination}");
+            }
+            // Set proper ownership
+            exec("chown -R apache:apache " . escapeshellarg($destination));
             Log::info("Created destination directory: {$destination}");
         }
+
+        // Use absolute paths for rsync
+        $source = realpath($source);
+        $destination = realpath($destination);
 
         // Use rsync if available for better performance
         exec('which rsync', $output, $returnCode);
         if ($returnCode === 0) {
-            $rsyncCommand = "rsync -av --progress {$source}/ {$destination}/";
+            $rsyncCommand = sprintf(
+                'rsync -av --progress %s/ %s/',
+                escapeshellarg($source),
+                escapeshellarg($destination)
+            );
+            
             exec($rsyncCommand, $output, $returnCode);
             if ($returnCode === 0) {
                 Log::info("Directory copied successfully using rsync");
+                // Set proper permissions after copy
+                exec("chown -R apache:apache " . escapeshellarg($destination));
                 return;
             }
-            Log::warning("Rsync failed, falling back to PHP copy");
+            Log::warning("Rsync failed, falling back to PHP copy", [
+                'error' => implode("\n", $output)
+            ]);
         }
 
         // Fallback to PHP's copy if rsync fails
@@ -89,9 +108,12 @@ class SaccoProvisioner
 
             if ($currentFile % 10 === 0) {
                 $progress = round(($currentFile / $totalFiles) * 100, 2);
-                //Log::info("Copying files... {$progress}% complete");
+                Log::info("Copying files... {$progress}% complete");
             }
         }
+
+        // Set proper permissions after copy
+        exec("chown -R apache:apache " . escapeshellarg($destination));
 
         Log::info("Directory copy completed: {$totalFiles} files copied");
     }
