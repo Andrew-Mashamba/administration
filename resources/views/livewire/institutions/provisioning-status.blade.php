@@ -58,6 +58,10 @@
         </div>
     </div>
 
+    <div class="mb-6 rounded-lg shadow">
+        <livewire:saccos-management />
+    </div>
+
     <!-- Filters -->
     <div class="bg-white rounded-lg shadow mb-6">
         <div class="p-4">

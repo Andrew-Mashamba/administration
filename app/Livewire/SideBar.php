@@ -21,16 +21,16 @@ class SideBar extends Component
             ->toArray();
         
         // Get the current route name to determine initial tab
-        $routeName = request()->route()->getName();
-        if (str_contains($routeName, 'dashboard')) {
-            $this->tab_id = 1;
-        } elseif (str_contains($routeName, 'users')) {
-            $this->tab_id = 2;
-        } elseif (str_contains($routeName, 'institutions')) {
-            $this->tab_id = 3;
-        } elseif (str_contains($routeName, 'settings')) {
-            $this->tab_id = 4;
-        }
+        // $routeName = request()->route()->getName();
+        // if (str_contains($routeName, 'dashboard')) {
+        //     $this->tab_id = 1;
+        // } elseif (str_contains($routeName, 'users')) {
+        //     $this->tab_id = 2;
+        // } elseif (str_contains($routeName, 'institutions')) {
+        //     $this->tab_id = 3;
+        // } elseif (str_contains($routeName, 'reports')) {
+        //     $this->tab_id = 4;
+        // }
     }
 
     public function menuItemClicked($item)

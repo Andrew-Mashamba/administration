@@ -35,14 +35,16 @@ class System extends Component
             ->toArray();
 
         // Get the current route name to determine initial tab
-        $routeName = request()->route()->getName();
-        if (str_contains($routeName, 'dashboard')) {
-            $this->menu_id = 1;
-        } elseif (str_contains($routeName, 'users')) {
-            $this->menu_id = 2;
-        } elseif (str_contains($routeName, 'institutions')) {
-            $this->menu_id = 3;
-        }
+        // $routeName = request()->route()->getName();
+        // if (str_contains($routeName, 'dashboard')) {
+        //     $this->menu_id = 1;
+        // } elseif (str_contains($routeName, 'users')) {
+        //     $this->menu_id = 2;
+        // } elseif (str_contains($routeName, 'institutions')) {
+        //     $this->menu_id = 3;
+        // } elseif (str_contains($routeName, 'reports')) {
+        //     $this->menu_id = 4;
+        // }
     }
 
     protected function checkUserStatus()
