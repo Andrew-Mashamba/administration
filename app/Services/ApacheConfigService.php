@@ -25,6 +25,15 @@ class ApacheConfigService
                 throw new Exception("Target path does not exist: {$targetPath}");
             }
 
+            // Ensure Apache directories exist
+            if (!File::exists($this->apacheConfigDir)) {
+                throw new Exception("Apache configuration directory does not exist: {$this->apacheConfigDir}");
+            }
+
+            if (!File::exists($this->apacheSitesDir)) {
+                throw new Exception("Apache sites directory does not exist: {$this->apacheSitesDir}");
+            }
+
             // Create Apache configuration
             $configContent = $this->generateApacheConfig($alias, $targetPath);
             $configPath = "{$this->apacheConfigDir}/{$alias}.conf";
@@ -45,13 +54,15 @@ class ApacheConfigService
             }
 
             // Test Apache configuration
-            exec('apache2ctl -t', $output, $returnCode);
+            $output = [];
+            $returnCode = 0;
+            exec('apache2ctl -t 2>&1', $output, $returnCode);
             if ($returnCode !== 0) {
                 throw new Exception("Apache configuration test failed: " . implode("\n", $output));
             }
 
             // Reload Apache
-            exec('systemctl reload apache2', $output, $returnCode);
+            exec('systemctl reload apache2 2>&1', $output, $returnCode);
             if ($returnCode !== 0) {
                 throw new Exception("Failed to reload Apache: " . implode("\n", $output));
             }
