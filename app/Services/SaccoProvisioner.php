@@ -398,47 +398,40 @@ private function configureApache(string $alias, string $targetPath): void
         DB::disconnect($originalConnection);
 
         try {
-            // Configure and connect to temporary database
-            config([
-                'database.connections.temp_connection' => [
-                    'driver' => 'pgsql',
-                    'host' => $dbHost,
-                    'port' => '5432',
-                    'database' => $dbName,
-                    'username' => $dbUser,
-                    'password' => $dbPassword,
-                    'charset' => 'utf8',
-                    'prefix' => '',
-                    'prefix_indexes' => true,
-                    'search_path' => 'public',
-                    'sslmode' => 'prefer',
-                ]
-            ]);
+            // Create a temporary database config file
+            $tempConfigPath = "{$targetPath}/config/database.php";
+            $configContent = <<<PHP
+<?php
 
-            // Set as default connection and ensure it's connected
-            config(['database.default' => 'temp_connection']);
-            DB::purge('temp_connection');
-            DB::reconnect('temp_connection');
+return [
+    'default' => 'pgsql',
+    'connections' => [
+        'pgsql' => [
+            'driver' => 'pgsql',
+            'host' => '{$dbHost}',
+            'port' => '5432',
+            'database' => '{$dbName}',
+            'username' => '{$dbUser}',
+            'password' => '{$dbPassword}',
+            'charset' => 'utf8',
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'search_path' => 'public',
+            'sslmode' => 'prefer',
+        ],
+    ],
+];
+PHP;
+            file_put_contents($tempConfigPath, $configContent);
 
-            // Verify connection
-            try {
-                DB::connection('temp_connection')->getPdo();
-                Log::info("Successfully connected to temporary database", [
-                    'database' => $dbName,
-                    'host' => $dbHost
-                ]);
-            } catch (Exception $e) {
-                throw new Exception("Failed to connect to temporary database: " . $e->getMessage());
-            }
-
-            // Run migrations using the temporary connection
-            $process = new Process(['php', 'artisan', 'migrate:fresh', '--force', '--database=temp_connection']);
+            // Run migrations
+            $process = new Process(['php', 'artisan', 'migrate:fresh', '--force']);
             $process->setWorkingDirectory($targetPath);
             $process->setTimeout(300);
             $process->mustRun();
 
             // Run seeders
-            $process = new Process(['php', 'artisan', 'db:seed', '--database=temp_connection']);
+            $process = new Process(['php', 'artisan', 'db:seed']);
             $process->setWorkingDirectory($targetPath);
             $process->setTimeout(300);
             $process->mustRun();
@@ -454,9 +447,12 @@ private function configureApache(string $alias, string $targetPath): void
             $process->setTimeout(300);
             $process->mustRun();
 
+            // Clean up temporary config
+            unlink($tempConfigPath);
+
             // Restore original connection
             config(['database.default' => $originalConnection]);
-            DB::purge('temp_connection');
+            DB::purge('pgsql');
             DB::reconnect($originalConnection);
 
         } catch (Exception $e) {
