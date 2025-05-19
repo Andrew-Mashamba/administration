@@ -2,7 +2,6 @@
 
 use Illuminate\Support\Facades\Route;
 use App\Livewire\System;
-use App\Livewire\ProvisioningStatusList;
 
 // Route::get('/', function () {
 //     return view('welcome');
@@ -20,7 +19,10 @@ Route::middleware([
     config('jetstream.auth_session'),
     'verified',
 ])->group(function () {
+    Route::get('/', function () {
+        return redirect()->route('system');
+    })->name('home');
+
     Route::get('/system', System::class)->name('system');
-    //Route::get('/provisioning-status', ProvisioningStatusList::class)->name('provisioning.status');
 });
 

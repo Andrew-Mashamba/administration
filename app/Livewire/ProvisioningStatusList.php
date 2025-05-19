@@ -12,11 +12,9 @@ class ProvisioningStatusList extends Component
 
     public function render()
     {
-        $statuses = ProvisioningStatus::latest()
-            ->paginate(10);
-
         return view('livewire.provisioning-status-list', [
-            'statuses' => $statuses
+            'statuses' => ProvisioningStatus::latest()
+                ->paginate(10)
         ]);
     }
 

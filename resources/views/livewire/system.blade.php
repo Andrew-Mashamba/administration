@@ -5,7 +5,13 @@
                 <livewire:dashboard />
                 @break
             @case(2)
-                <livewire:institutions />
+                <div class="p-6">
+                    <div class="mb-6">
+                        <h3 class="text-lg font-medium text-gray-900">Institutions</h3>
+                        <p class="mt-1 text-sm text-gray-600">Manage SACCOs and view provisioning status.</p>
+                    </div>
+                    <livewire:provisioning-status-list />
+                </div>
                 @break
             @case(3)
                 <livewire:users />
