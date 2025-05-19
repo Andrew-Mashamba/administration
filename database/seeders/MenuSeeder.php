@@ -13,9 +13,6 @@ class MenuSeeder extends Seeder
      */
     public function run(): void
     {
-        // check if the menu already exists
-        $menu = Menu::where('menu_name', 'Dashboard')->first();
-        if (!$menu) {
             $menus = [
                 [
                     'system_id' => 1,
@@ -53,6 +50,15 @@ class MenuSeeder extends Seeder
                 'created_at' => now(),
                 'updated_at' => now(),
             ],
+             [
+                    'system_id' => 1,
+                    'menu_name' => 'Profile',
+                    'menu_description' => 'User profile settings',
+                    'menu_title' => 'Profile',
+                    'menu_number' => 5,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ],
             // [
             //     'system_id' => 1,
             //     'menu_name' => 'reports',
@@ -64,7 +70,21 @@ class MenuSeeder extends Seeder
             // ],
         ];
 
-        DB::table('menus')->insert($menus);
+        foreach ($menus as $menuData) {
+            // Only insert if menu_name doesn't exist for the system_id
+            Menu::firstOrCreate(
+                [
+                    'menu_name' => $menuData['menu_name'],
+                    'system_id' => $menuData['system_id'],
+                ],
+                [
+                    'menu_description' => $menuData['menu_description'],
+                    'menu_title' => $menuData['menu_title'],
+                    'menu_number' => $menuData['menu_number'],
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]
+            );
         }
     }
-} 
+}

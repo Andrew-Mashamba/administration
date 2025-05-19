@@ -24,14 +24,17 @@
                 @case(4)
                     <livewire:reports.dashboard />
                     @break
-                @case(9)
+                @case(5)
+                    <livewire:profile.profile />
+                    @break
+                @case(9) {{-- special message for blocked, pending, deleted accounts--}}
                     <div class="p-4">
                         <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
                             <strong class="font-bold">Account Status Issue!</strong>
                             <span class="block sm:inline"> Your account is either pending, blocked, or deleted. Please contact support for assistance.</span>
                         </div>
                     </div>
-                    @break
+                    @break               
                 @default
                     <livewire:dashboard.dashboard/>
             @endswitch

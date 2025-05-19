@@ -15,7 +15,7 @@
         </div>
 
         <!-- Content Area -->
-        <div class="min-h-[calc(100vh-10rem)]">
+        <div class="">
             <div wire:loading class="w-full p-2">
                 <div class="flex items-center justify-center min-h-[calc(100vh-4rem)] bg-white w-full rounded-md">
                     <div class="text-center m-auto">
