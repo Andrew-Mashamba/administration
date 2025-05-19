@@ -3,6 +3,8 @@
 namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Livewire\Livewire;
+use App\Livewire\NavigationMenu;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -19,7 +21,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        Livewire::component('navigation-menu', NavigationMenu::class);
 
 	\Livewire\Livewire::setUpdateRoute(function ($handle) {
     return \Illuminate\Support\Facades\Route::post('/livewire/update', $handle);
