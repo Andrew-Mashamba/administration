@@ -23,54 +23,54 @@ class ApacheConfigService
     public function configure(string $alias, string $targetPath): void
     {
         try {
-            // // Validate paths
-            // if (!File::exists($targetPath)) {
-            //     throw new Exception("Target path does not exist: {$targetPath}");
-            // }
+            // Validate paths
+            if (!File::exists($targetPath)) {
+                throw new Exception("Target path does not exist: {$targetPath}");
+            }
 
-            // // Ensure Apache directories exist
-            // if (!File::exists($this->apacheConfigDir)) {
-            //     throw new Exception("Apache configuration directory does not exist: {$this->apacheConfigDir}");
-            // }
+            // Ensure Apache directories exist
+            if (!File::exists($this->apacheConfigDir)) {
+                throw new Exception("Apache configuration directory does not exist: {$this->apacheConfigDir}");
+            }
 
-            // // Create Apache configuration
-            // $configContent = $this->generateApacheConfig($alias, $targetPath);
-            // $configPath = "{$this->apacheConfigDir}/{$alias}.conf";
+            // Create Apache configuration
+            $configContent = $this->generateApacheConfig($alias, $targetPath);
+            $configPath = "{$this->apacheConfigDir}/{$alias}.conf";
 
-            // // Write configuration file using sudo
-            // $tempFile = tempnam(sys_get_temp_dir(), 'apache_');
-            // if (!File::put($tempFile, $configContent)) {
-            //     throw new Exception("Failed to write temporary configuration file");
-            // }
+            // Write configuration file using sudo
+            $tempFile = tempnam(sys_get_temp_dir(), 'apache_');
+            if (!File::put($tempFile, $configContent)) {
+                throw new Exception("Failed to write temporary configuration file");
+            }
 
-            // // Move the file to Apache config directory using sudo
-            // $process = new Process(['sudo', 'mv', $tempFile, $configPath]);
-            // $process->setWorkingDirectory($this->workingDir);
-            // $process->setTimeout(30);
-            // $process->mustRun();
+            // Move the file to Apache config directory using sudo
+            $process = new Process(['sudo', 'mv', $tempFile, $configPath]);
+            $process->setWorkingDirectory($this->workingDir);
+            $process->setTimeout(30);
+            $process->mustRun();
 
-            // // Set proper permissions
-            // $process = new Process(['sudo', 'chown', 'root:root', $configPath]);
-            // $process->setWorkingDirectory($this->workingDir);
-            // $process->setTimeout(30);
-            // $process->mustRun();
+            // Set proper permissions
+            $process = new Process(['sudo', 'chown', 'root:root', $configPath]);
+            $process->setWorkingDirectory($this->workingDir);
+            $process->setTimeout(30);
+            $process->mustRun();
 
-            // $process = new Process(['sudo', 'chmod', '644', $configPath]);
-            // $process->setWorkingDirectory($this->workingDir);
-            // $process->setTimeout(30);
-            // $process->mustRun();
+            $process = new Process(['sudo', 'chmod', '644', $configPath]);
+            $process->setWorkingDirectory($this->workingDir);
+            $process->setTimeout(30);
+            $process->mustRun();
 
-            // // Test Apache configuration
-            // $process = new Process(['sudo', 'apachectl', '-t']);
-            // $process->setWorkingDirectory($this->workingDir);
-            // $process->setTimeout(30);
-            // $process->mustRun();
+            // Test Apache configuration
+            $process = new Process(['sudo', 'apachectl', '-t']);
+            $process->setWorkingDirectory($this->workingDir);
+            $process->setTimeout(30);
+            $process->mustRun();
 
-            // // Reload Apache
-            // $process = new Process(['sudo', 'systemctl', 'reload', 'httpd']);
-            // $process->setWorkingDirectory($this->workingDir);
-            // $process->setTimeout(30);
-            // $process->mustRun();
+            // Reload Apache
+            $process = new Process(['sudo', 'systemctl', 'reload', 'httpd']);
+            $process->setWorkingDirectory($this->workingDir);
+            $process->setTimeout(30);
+            $process->mustRun();
 
             Log::info("Apache configuration completed successfully", [
                 'alias' => $alias,

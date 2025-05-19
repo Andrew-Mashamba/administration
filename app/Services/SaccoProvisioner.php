@@ -432,19 +432,24 @@ private function configureApache(string $alias, string $targetPath): void
             }
 
             // Run migrations using the temporary connection
-            $process = Process::fromShellCommandline('php artisan migrate:fresh --force --database=temp_connection');
+            $process = new Process(['php', 'artisan', 'migrate:fresh', '--force', '--database=temp_connection']);
             $process->setWorkingDirectory($targetPath);
             $process->setTimeout(300);
             $process->mustRun();
 
             // Run seeders
-            $process = Process::fromShellCommandline('php artisan db:seed --database=temp_connection');
+            $process = new Process(['php', 'artisan', 'db:seed', '--database=temp_connection']);
             $process->setWorkingDirectory($targetPath);
             $process->setTimeout(300);
             $process->mustRun();
 
             // Set permissions
-            $process = Process::fromShellCommandline('chown -R apache:apache storage bootstrap/cache && chmod -R 775 storage bootstrap/cache');
+            $process = new Process(['chown', '-R', 'apache:apache', 'storage', 'bootstrap/cache']);
+            $process->setWorkingDirectory($targetPath);
+            $process->setTimeout(300);
+            $process->mustRun();
+
+            $process = new Process(['chmod', '-R', '775', 'storage', 'bootstrap/cache']);
             $process->setWorkingDirectory($targetPath);
             $process->setTimeout(300);
             $process->mustRun();
