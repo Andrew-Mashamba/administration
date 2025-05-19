@@ -80,7 +80,7 @@ class System extends Component
     public function render()
     {
         return view('livewire.system', [
-            'menuItems' => $this->menuItems
+            'layout' => 'components.layouts.app'
         ]);
     }
 }
