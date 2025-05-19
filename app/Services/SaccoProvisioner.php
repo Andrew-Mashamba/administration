@@ -227,7 +227,7 @@ private function configureApache(string $alias, string $targetPath): void
     private function sendWelcomeEmail(string $email, string $password, string $alias): void
     {
         $url = "{$this->baseUrl}/{$alias}";
-        $instanceDomain = "{$alias}.nbcsaccos.co.tz";
+        $instanceDomain = "{$alias}.zima-uat.site";
 
         try {
             Mail::to($email)
@@ -373,7 +373,7 @@ private function configureApache(string $alias, string $targetPath): void
 
         // Set application configuration
         $editor->setKeys([
-            'APP_URL' => "http://{$alias}.nbcsaccos.co.tz",
+            'APP_URL' => "http://{$alias}.zima-uat.site",
             'APP_ENV' => 'production',
             'APP_DEBUG' => 'false',
             'LOG_CHANNEL' => 'daily',

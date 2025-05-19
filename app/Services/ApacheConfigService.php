@@ -67,10 +67,10 @@ class ApacheConfigService
             $process->mustRun();
 
             // Reload Apache
-            $process = new Process(['sudo', 'systemctl', 'reload', 'httpd']);
-            $process->setWorkingDirectory($this->workingDir);
-            $process->setTimeout(30);
-            $process->mustRun();
+            // $process = new Process(['sudo', 'systemctl', 'reload', 'httpd']);
+            // $process->setWorkingDirectory($this->workingDir);
+            // $process->setTimeout(30);
+            // $process->mustRun();
 
             Log::info("Apache configuration completed successfully", [
                 'alias' => $alias,
@@ -125,7 +125,7 @@ class ApacheConfigService
         $logDir = '/var/log/httpd';
         return <<<EOT
 <VirtualHost *:80>
-    ServerName {$alias}.nbcsaccos.co.tz
+    ServerName {$alias}.zima-uat.site
     DocumentRoot {$targetPath}/public
 
     <Directory {$targetPath}/public>
