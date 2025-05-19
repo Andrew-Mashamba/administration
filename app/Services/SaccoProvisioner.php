@@ -45,11 +45,6 @@ class SaccoProvisioner
         set_time_limit(0);
         Log::info("Starting directory copy from {$source} to {$destination}");
 
-        // Ensure we're in the correct working directory
-        if (!chdir($this->workingDir)) {
-            throw new Exception("Failed to set working directory to: {$this->workingDir}");
-        }
-
         // Ensure source exists
         if (!File::exists($source)) {
             throw new Exception("Source directory not found: {$source}");
@@ -73,22 +68,26 @@ class SaccoProvisioner
         exec('which rsync', $output, $returnCode);
         if ($returnCode === 0) {
             $rsyncCommand = sprintf(
-                'cd %s && rsync -av --progress %s/ %s/',
-                escapeshellarg($this->workingDir),
+                'rsync -av --progress %s/ %s/',
                 escapeshellarg($source),
                 escapeshellarg($destination)
             );
             
-            exec($rsyncCommand, $output, $returnCode);
-            if ($returnCode === 0) {
+            $process = Process::fromShellCommandline($rsyncCommand);
+            $process->setWorkingDirectory($this->workingDir);
+            $process->setTimeout(300);
+            
+            try {
+                $process->mustRun();
                 Log::info("Directory copied successfully using rsync");
                 // Set proper permissions after copy
                 exec("chown -R apache:apache " . escapeshellarg($destination));
                 return;
+            } catch (Exception $e) {
+                Log::warning("Rsync failed, falling back to PHP copy", [
+                    'error' => $e->getMessage()
+                ]);
             }
-            Log::warning("Rsync failed, falling back to PHP copy", [
-                'error' => implode("\n", $output)
-            ]);
         }
 
         // Fallback to PHP's copy if rsync fails
@@ -430,27 +429,23 @@ private function configureApache(string $alias, string $targetPath): void
                 throw new Exception("Failed to connect to temporary database: " . $e->getMessage());
             }
 
-            // Change to target directory
-            $currentDir = getcwd();
-            chdir($targetPath);
-
             // Run migrations using the temporary connection
             $process = Process::fromShellCommandline('php artisan migrate:fresh --force --database=temp_connection');
+            $process->setWorkingDirectory($targetPath);
             $process->setTimeout(300);
             $process->mustRun();
 
             // Run seeders
             $process = Process::fromShellCommandline('php artisan db:seed --database=temp_connection');
+            $process->setWorkingDirectory($targetPath);
             $process->setTimeout(300);
             $process->mustRun();
 
             // Set permissions
             $process = Process::fromShellCommandline('chown -R apache:apache storage bootstrap/cache && chmod -R 775 storage bootstrap/cache');
+            $process->setWorkingDirectory($targetPath);
             $process->setTimeout(300);
             $process->mustRun();
-
-            // Change back to original directory
-            chdir($currentDir);
 
             // Restore original connection
             config(['database.default' => $originalConnection]);
