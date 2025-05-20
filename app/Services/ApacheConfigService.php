@@ -137,6 +137,24 @@ class ApacheConfigService
     ErrorLog {$logDir}/{$alias}-error.log
     CustomLog {$logDir}/{$alias}-access.log combined
 </VirtualHost>
+
+<VirtualHost *:443>
+    ServerName {$alias}.zima-uat.site
+    DocumentRoot {$targetPath}/public
+    
+    SSLEngine on
+    SSLCertificateFile /etc/letsencrypt/live/zima-uat.site-0001/fullchain.pem
+    SSLCertificateKeyFile /etc/letsencrypt/live/zima-uat.site-0001/privkey.pem
+    
+    <Directory {$targetPath}/public>
+        Options Indexes FollowSymLinks
+        AllowOverride All
+        Require all granted
+    </Directory>
+    
+    ErrorLog {$logDir}/{$alias}-error.log
+    CustomLog {$logDir}/{$alias}-access.log combined
+</VirtualHost>
 EOT;
     }
 }

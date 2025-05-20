@@ -44,6 +44,7 @@ class SaccoProvisioner
     {
         set_time_limit(0);
         Log::info("Starting directory copy from {$source} to {$destination}");
+        $this->notifyProgress('cloning', 'Starting directory copy');
 
         // Ensure source exists
         if (!File::exists($source)) {
@@ -67,26 +68,41 @@ class SaccoProvisioner
         // Use rsync if available for better performance
         exec('which rsync', $output, $returnCode);
         if ($returnCode === 0) {
-            // Use absolute paths and --no-relative option to avoid working directory issues
-            $rsyncCommand = sprintf(
-                'rsync -av --no-relative --progress %s/ %s/',
-                escapeshellarg($source),
-                escapeshellarg($destination)
-            );
-            
-            $process = new Process(['rsync', '-av', '--no-relative', '--progress', $source . '/', $destination . '/']);
-            $process->setTimeout(300);
+            $this->notifyProgress('cloning', 'Using rsync for faster copy');
             
             try {
-                $process->mustRun();
+                $process = new Process(['rsync', '-av', '--no-relative', '--progress', $source . '/', $destination . '/']);
+                $process->setTimeout(300);
+                $process->run(function ($type, $buffer) {
+                    if (Process::ERR === $type) {
+                        Log::warning("Rsync error output: " . $buffer);
+                    } else {
+                        // Parse rsync progress output
+                        if (preg_match('/(\d+)%\s+(\d+\.\d+[KMG]\/s)/', $buffer, $matches)) {
+                            $progress = (int)$matches[1];
+                            $speed = $matches[2];
+                            $this->notifyProgress('cloning', "Copying files... {$progress}% complete ({$speed})", [
+                                'progress' => $progress,
+                                'speed' => $speed
+                            ]);
+                        }
+                    }
+                });
+
+                if (!$process->isSuccessful()) {
+                    throw new Exception("Rsync failed: " . $process->getErrorOutput());
+                }
+
                 Log::info("Directory copied successfully using rsync");
                 // Set proper permissions after copy
                 exec("chown -R apache:apache " . escapeshellarg($destination));
+                $this->notifyProgress('cloning', 'Directory copy completed');
                 return;
             } catch (Exception $e) {
                 Log::warning("Rsync failed, falling back to PHP copy", [
                     'error' => $e->getMessage()
                 ]);
+                $this->notifyProgress('cloning', 'Falling back to PHP copy method');
             }
         }
 
@@ -98,23 +114,39 @@ class SaccoProvisioner
 
         $totalFiles = iterator_count($iterator);
         $currentFile = 0;
+        $lastProgress = 0;
 
         foreach ($iterator as $item) {
             $currentFile++;
             $relativePath = str_replace($source . DIRECTORY_SEPARATOR, '', $item->getPathname());
             $target = $destination . DIRECTORY_SEPARATOR . $relativePath;
 
-            if ($item->isDir()) {
-                if (!File::exists($target)) {
-                    File::makeDirectory($target, 0755, true);
+            try {
+                if ($item->isDir()) {
+                    if (!File::exists($target)) {
+                        File::makeDirectory($target, 0755, true);
+                    }
+                } else {
+                    File::copy($item, $target);
                 }
-            } else {
-                File::copy($item, $target);
-            }
 
-            if ($currentFile % 10 === 0) {
+                // Update progress every 5% or every 10 files
                 $progress = round(($currentFile / $totalFiles) * 100, 2);
-                Log::info("Copying files... {$progress}% complete");
+                if ($progress >= $lastProgress + 5 || $currentFile % 10 === 0) {
+                    $lastProgress = $progress;
+                    $this->notifyProgress('cloning', "Copying files... {$progress}% complete", [
+                        'progress' => $progress,
+                        'current_file' => $currentFile,
+                        'total_files' => $totalFiles
+                    ]);
+                }
+            } catch (Exception $e) {
+                Log::error("Failed to copy file", [
+                    'source' => $item->getPathname(),
+                    'target' => $target,
+                    'error' => $e->getMessage()
+                ]);
+                throw new Exception("Failed to copy file {$relativePath}: " . $e->getMessage());
             }
         }
 
@@ -122,6 +154,9 @@ class SaccoProvisioner
         exec("chown -R apache:apache " . escapeshellarg($destination));
 
         Log::info("Directory copy completed: {$totalFiles} files copied");
+        $this->notifyProgress('cloning', 'Directory copy completed successfully', [
+            'total_files' => $totalFiles
+        ]);
     }
 
     private function updateLivewireConfig(string $targetPath, string $alias): void

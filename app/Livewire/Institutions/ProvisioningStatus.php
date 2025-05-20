@@ -120,6 +120,73 @@ class ProvisioningStatus extends Component
         return $query->latest()->paginate(10);
     }
 
+    public function getEstimatedTimeRemaining($status)
+    {
+        if ($status->status !== 'in_progress' || !$status->started_at) {
+            return null;
+        }
+
+        $elapsedTime = now()->diffInSeconds($status->started_at);
+        $currentProgress = $status->progress;
+
+        if ($currentProgress <= 0) {
+            return 'Calculating...';
+        }
+
+        // Use predefined step progress for more accurate estimation
+        $steps = $this->provisioningSteps;
+        $currentStepIndex = array_search($status->step, array_keys($steps));
+        $nextStepIndex = $currentStepIndex + 1;
+        
+        if ($nextStepIndex >= count($steps)) {
+            return 'Almost done...';
+        }
+
+        $currentStepProgress = $steps[array_keys($steps)[$currentStepIndex]]['progress'];
+        $nextStepProgress = $steps[array_keys($steps)[$nextStepIndex]]['progress'];
+        
+        // Calculate time per progress percentage
+        $timePerProgress = $elapsedTime / $currentStepProgress;
+        
+        // Estimate remaining time based on next step's progress
+        $remainingProgress = 100 - $currentStepProgress;
+        $estimatedRemainingTime = $timePerProgress * $remainingProgress;
+
+        if ($estimatedRemainingTime < 60) {
+            return round($estimatedRemainingTime) . ' seconds';
+        } elseif ($estimatedRemainingTime < 3600) {
+            return round($estimatedRemainingTime / 60) . ' minutes';
+        } else {
+            return round($estimatedRemainingTime / 3600, 1) . ' hours';
+        }
+    }
+
+    public function getErrorDetails($status)
+    {
+        if ($status->status !== 'failed' || empty($status->error_details)) {
+            return null;
+        }
+
+        $details = $status->error_details;
+        $formattedDetails = [];
+
+        if (isset($details['trace'])) {
+            $formattedDetails[] = [
+                'type' => 'Stack Trace',
+                'content' => $details['trace']
+            ];
+        }
+
+        if (isset($details['context'])) {
+            $formattedDetails[] = [
+                'type' => 'Context',
+                'content' => json_encode($details['context'], JSON_PRETTY_PRINT)
+            ];
+        }
+
+        return $formattedDetails;
+    }
+
     public function getStepProgress($step)
     {
         return $this->provisioningSteps[$step]['progress'] ?? 0;
@@ -140,31 +207,6 @@ class ProvisioningStatus extends Component
         $steps = array_keys($this->provisioningSteps);
         $currentIndex = array_search($currentStep, $steps);
         return $steps[$currentIndex + 1] ?? null;
-    }
-
-    public function getEstimatedTimeRemaining($status)
-    {
-        if ($status->status !== 'in_progress' || !$status->started_at) {
-            return null;
-        }
-
-        $elapsedTime = now()->diffInSeconds($status->started_at);
-        $currentProgress = $status->progress;
-
-        if ($currentProgress <= 0) {
-            return 'Calculating...';
-        }
-
-        $estimatedTotalTime = ($elapsedTime / $currentProgress) * 100;
-        $remainingTime = $estimatedTotalTime - $elapsedTime;
-
-        if ($remainingTime < 60) {
-            return round($remainingTime) . ' seconds';
-        } elseif ($remainingTime < 3600) {
-            return round($remainingTime / 60) . ' minutes';
-        } else {
-            return round($remainingTime / 3600, 1) . ' hours';
-        }
     }
 
     public function getLogs($id)
@@ -188,7 +230,8 @@ class ProvisioningStatus extends Component
 
             $logger->logStep('retry', 'Initiating retry of provisioning process', [
                 'previous_status' => $status->status,
-                'previous_step' => $status->step
+                'previous_step' => $status->step,
+                'previous_error' => $status->error_details
             ]);
 
             $status->update([
@@ -197,6 +240,7 @@ class ProvisioningStatus extends Component
                 'step' => 'initializing',
                 'message' => 'Retrying provisioning...',
                 'data' => null,
+                'error_details' => null,
                 'started_at' => now(),
                 'completed_at' => null
             ]);
@@ -231,7 +275,8 @@ class ProvisioningStatus extends Component
         $logger->logStep('notification', 'Sending step notification', [
             'step' => $step,
             'is_error' => $isError,
-            'recipients' => $recipients
+            'recipients' => $recipients,
+            'progress' => $status->progress
         ]);
 
         foreach ($recipients as $email) {
@@ -240,7 +285,8 @@ class ProvisioningStatus extends Component
                     $status->alias,
                     $step,
                     $this->getStepDescription($step),
-                    $isError ? $this->getStepErrorMessage($step) : null
+                    $isError ? $this->getStepErrorMessage($step) : null,
+                    $status->progress
                 ));
         }
 
