@@ -106,7 +106,7 @@
             },
             series: [{{ $data['microfinanceInstitutions'] }}, {{ $data['saccoInstitutions'] }}],
             labels: ['Microfinances', 'SACCOS'],
-            colors: ['#2563EB', '#DC2626'],
+            colors: ['#2D3A89', '#DC2626'],
             plotOptions: {
                 pie: {
                     donut: {
@@ -154,7 +154,7 @@
                 name: 'SACCOS',
                 data: [{{ $data['activeSaccoInstitutions'] ?? 0 }}, {{ $data['inactiveSaccoInstitutions'] ?? 0 }}]
             }],
-            colors: ['#2563EB', '#DC2626'],
+            colors: ['#2D3A89', '#DC2626'],
             plotOptions: {
                 bar: {
                     horizontal: true,
