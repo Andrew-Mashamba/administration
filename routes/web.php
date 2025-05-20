@@ -19,14 +19,9 @@ Route::middleware([
     config('jetstream.auth_session'),
     'verified',
 ])->group(function () {
-
-    
-
     Route::get('/', function () {
         return redirect()->route('system');
     })->name('home');
 
     Route::get('/system', System::class)->name('system');
 });
-
-Route::get('/system', System::class)->name('system');

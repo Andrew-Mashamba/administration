@@ -8,6 +8,7 @@ use App\Jobs\ProvisionSaccoJob;
 use Illuminate\Support\Facades\Notification;
 use App\Notifications\ProvisioningStatusNotification;
 use App\Services\ProvisioningLogger;
+use App\Models\Institution;
 
 class ProvisioningStatus extends Component
 {
@@ -291,6 +292,18 @@ class ProvisioningStatus extends Component
         }
 
         $logger->logStep('notification', 'Step notification sent successfully');
+    }
+
+    public function viewSacco($alias)
+    {
+        $institution = Institution::where('alias', $alias)->firstOrFail();
+        
+        // Emit an event to show the SACCO view
+        $this->emit('showSaccoView', [
+            'alias' => $alias,
+            'name' => $institution->name,
+            'url' => "https://{$alias}.zima-uat.site"
+        ]);
     }
 
     public function render()
