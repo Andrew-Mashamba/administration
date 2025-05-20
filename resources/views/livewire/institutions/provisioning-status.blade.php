@@ -1,3 +1,4 @@
+<div>
 <div class="p-4">
     <!-- Statistics Cards -->
     <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
@@ -281,4 +282,6 @@
             </div>
         </div>
     </div>
+</div>
+
 </div>
