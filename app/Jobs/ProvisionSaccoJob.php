@@ -10,6 +10,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Notification;
+use Illuminate\Support\Facades\Log;
 
 class ProvisionSaccoJob implements ShouldQueue
 {
@@ -46,8 +47,22 @@ class ProvisionSaccoJob implements ShouldQueue
 
     public function handle()
     {
+        // Check for ongoing provisioning
         if (ProvisioningStatus::isProvisioningInProgress()) {
-            throw new \Exception('Another provisioning process is already in progress.');
+            $ongoing = ProvisioningStatus::where('status', 'in_progress')
+                ->whereNull('completed_at')
+                ->first();
+
+            Log::warning("Concurrent provisioning attempt blocked", [
+                'requested_alias' => $this->alias,
+                'ongoing_alias' => $ongoing->alias,
+                'ongoing_step' => $ongoing->step
+            ]);
+
+            throw new \Exception(
+                "Another provisioning process is already in progress for {$ongoing->alias}. " .
+                "Please wait for it to complete before starting a new one."
+            );
         }
 
         $status = ProvisioningStatus::create([
@@ -81,6 +96,12 @@ class ProvisionSaccoJob implements ShouldQueue
             $status->markCompleted();
 
         } catch (\Exception $e) {
+            Log::error("Provisioning failed", [
+                'alias' => $this->alias,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
             $status->markFailed($e->getMessage());
             throw $e;
         }
