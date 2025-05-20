@@ -23,9 +23,9 @@
             </div>      
         </div>
     </div>
-    <div class="py-4">
-        <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
-            <div class="bg-white overflow-hidden shadow-xl sm:rounded-lg p-6 relative">                
+    <div class="">
+        <div class="max-w-7xl mx-auto">
+            <div class="bg-white overflow-hidden shadow-xl sm:rounded-lg p-6">                
                 <livewire:reports.institutions-table />
                 
                 <div wire:loading wire:target="exportSelected" class="absolute inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50">
