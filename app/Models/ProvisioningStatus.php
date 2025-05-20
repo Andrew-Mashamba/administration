@@ -13,43 +13,51 @@ class ProvisioningStatus extends Model
         'step',
         'message',
         'data',
+        'progress',
+        'error_details',
+        'started_at',
+        'completed_at',
         'db_name',
         'db_host',
         'db_user',
         'db_password',
         'manager_email',
-        'it_email',
-        'started_at',
-        'completed_at',
-        'progress',
-        'error_details'
+        'it_email'
     ];
 
     protected $casts = [
         'data' => 'array',
+        'error_details' => 'array',
         'started_at' => 'datetime',
         'completed_at' => 'datetime',
-        'error_details' => 'array'
+        'progress' => 'integer'
     ];
 
     public static function isProvisioningInProgress(): bool
     {
-        return static::where('status', 'in_progress')
+        return self::where('status', 'in_progress')
             ->whereNull('completed_at')
             ->exists();
     }
 
-    public static function markStarted(string $alias): self
+    public function updateProgress($step, $message, $data = null)
     {
-        return static::create([
-            'alias' => $alias,
-            'status' => 'in_progress',
-            'started_at' => now(),
-            'progress' => 0
+        $this->update([
+            'step' => $step,
+            'message' => $message,
+            'data' => $data,
+            'progress' => $this->calculateProgress($step)
+        ]);
+
+        Log::info("Provisioning progress updated", [
+            'alias' => $this->alias,
+            'step' => $step,
+            'message' => $message,
+            'progress' => $this->progress
         ]);
     }
 
-    public function markCompleted(): void
+    public function markCompleted()
     {
         $this->update([
             'status' => 'completed',
@@ -57,81 +65,59 @@ class ProvisioningStatus extends Model
             'completed_at' => now()
         ]);
 
-        Log::info("Provisioning completed successfully", [
+        Log::info("Provisioning completed", [
             'alias' => $this->alias,
-            'duration' => $this->started_at->diffInSeconds(now())
+            'completed_at' => $this->completed_at
         ]);
     }
 
-    public function markFailed(string $message, array $errorDetails = []): void
+    public function markFailed($errorMessage, array $errorDetails = [])
     {
         $this->update([
             'status' => 'failed',
-            'message' => $message,
-            'error_details' => $errorDetails,
+            'message' => "Provisioning failed: {$errorMessage}",
+            'error_details' => array_merge($errorDetails, [
+                'error' => $errorMessage,
+                'trace' => debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS)
+            ]),
             'completed_at' => now()
         ]);
 
         Log::error("Provisioning failed", [
             'alias' => $this->alias,
-            'message' => $message,
-            'error_details' => $errorDetails,
-            'duration' => $this->started_at->diffInSeconds(now())
+            'error' => $errorMessage,
+            'details' => $errorDetails
         ]);
     }
 
-    public function updateProgress(string $step, string $message, array $data = []): void
-    {
-        $progress = $this->calculateProgress($step);
-        
-        $this->update([
-            'step' => $step,
-            'message' => $message,
-            'data' => $data,
-            'progress' => $progress
-        ]);
-
-        Log::info("Provisioning progress updated", [
-            'alias' => $this->alias,
-            'step' => $step,
-            'progress' => $progress,
-            'message' => $message
-        ]);
-    }
-
-    private function calculateProgress(string $step): int
+    protected function calculateProgress($step)
     {
         $steps = [
-            'started' => 0,
-            'cloning' => 10,
-            'database' => 20,
-            'env' => 30,
-            'livewire' => 40,
-            'apache' => 50,
-            'post_install' => 60,
-            'users' => 70,
-            'finalizing' => 90,
+            'initializing' => 0,
+            'validating_credentials' => 5,
+            'creating_database' => 10,
+            'creating_schema' => 20,
+            'setting_up_core_tables' => 30,
+            'setting_up_auxiliary_tables' => 40,
+            'configuring_system_settings' => 50,
+            'setting_up_permissions' => 60,
+            'creating_admin_user' => 70,
+            'creating_manager_user' => 80,
+            'sending_setup_notifications' => 90,
+            'finalizing_setup' => 95,
             'completed' => 100
         ];
 
         return $steps[$step] ?? 0;
     }
 
-    public function getDurationAttribute(): string
+    public function getDurationAttribute()
     {
         if (!$this->started_at) {
-            return 'Not started';
+            return null;
         }
 
         $end = $this->completed_at ?? now();
-        $duration = $this->started_at->diffInSeconds($end);
-
-        if ($duration < 60) {
-            return $duration . ' seconds';
-        } elseif ($duration < 3600) {
-            return round($duration / 60) . ' minutes';
-        } else {
-            return round($duration / 3600, 1) . ' hours';
-        }
+        return $this->started_at->diffInSeconds($end);
     }
 }
