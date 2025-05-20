@@ -1,5 +1,5 @@
 <div>
-    <div class="bg-white shadow-sm rounded-lg">
+    <div class="bg-white shadow-sm rounded-lg max-w-5xl mx-auto">
         <!-- Submenu Navigation -->
         <div class="border-b border-gray-200">
             <nav class="flex space-x-8 px-4" aria-label="Tabs">

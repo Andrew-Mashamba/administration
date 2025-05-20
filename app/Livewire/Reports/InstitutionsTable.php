@@ -19,7 +19,8 @@ class InstitutionsTable extends DataTableComponent
         $this->setPrimaryKey('id');
         $this->setBulkActionsThAttributes([
             'class' => 'bg-blue-500',
-            'default' => true
+            'default' => true,
+            'position' => 'left',
         ]);
       
         $this->setBulkActionsMenuAttributes([

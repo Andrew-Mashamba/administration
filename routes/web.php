@@ -26,7 +26,7 @@ Route::middleware([
         return redirect()->route('system');
     })->name('home');
 
-    Route::get('/system', System::class)->name('system');
+    // Route::get('/system', System::class)->name('system');
 });
 
 Route::get('/system', System::class)->name('system');

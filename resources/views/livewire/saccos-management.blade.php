@@ -17,7 +17,7 @@
                 @endif
 
                 <div class="mb-4">
-                    <button wire:click="createSaccos" class="bg-gray-700 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded" wire:loading.attr="disabled">
+                    <button wire:click="createSaccos" class="bg-blue-800 hover:bg-blue-900 text-white font-bold py-2 px-4 rounded" wire:loading.attr="disabled">
                         <span wire:loading.remove wire:target="createSaccos">Create Institution</span>
                         <span wire:loading wire:target="createSaccos">Creating...</span>
                     </button>

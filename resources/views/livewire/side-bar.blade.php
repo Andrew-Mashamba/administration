@@ -73,7 +73,7 @@
    
 
         <!-- Sidebar -->
-        <div class="h-full overflow-y-auto lg:translate-x-0 mt-10"
+        <div class="h-full overflow-y-auto lg:translate-x-0 mt-5"
         >
             <!-- Navigation -->
             <nav id="sidebar" class="px-2 py-3 space-y-0.5">

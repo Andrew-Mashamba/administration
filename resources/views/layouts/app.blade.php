@@ -81,14 +81,14 @@
                 <div class="flex-1 ml-[var(--sidebar-width)] transition-all duration-300 ease-in-out">
                     @if (isset($header))
                         <header class="bg-white border-b border-gray-200 shadow-sm">
-                            <div class="w-full mx-auto py-6 px-6 sm:px-8 lg:px-10">
+                            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
                                 {{ $header }}
                             </div>
                         </header>
                     @endif
             
-                    <main class="p-6 sm:p-8">
-                        <div class="flex-1 max-w-7xl mx-auto">
+                    <main>
+                        <div class="max-w-7xl mx-auto p-6 px-4 sm:px-6 lg:px-8 py-6">
                             {{ $slot }}
                         </div>
                     </main>
