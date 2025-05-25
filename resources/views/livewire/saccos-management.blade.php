@@ -26,7 +26,7 @@
                 @endif
 
                 <div class="mb-4">
-                    <button wire:click="createSaccos" class="bg-gray-700 hover:bg-gray-700 text-white font-bold py-2 px-4 rounded" wire:loading.attr="disabled">
+                    <button wire:click="createSaccos" class="bg-blue-800 hover:bg-blue-900 text-white font-bold py-2 px-4 rounded" wire:loading.attr="disabled">
                         <span wire:loading.remove wire:target="createSaccos">Create Institution</span>
                         <span wire:loading wire:target="createSaccos">Creating...</span>
                     </button>
@@ -337,12 +337,9 @@
                             <thead>
                                 <tr>
                                     <th class="py-2 px-4 border-b">Name</th>
-                                    <th class="py-2 px-4 border-b">Institution Type</th>
-                                    <th class="py-2 px-4 border-b">Status</th>
-                                    <th class="py-2 px-4 border-b">Location</th>
-                                    <th class="py-2 px-4 border-b">Contact Person</th>
-                                    <th class="py-2 px-4 border-b">Phone</th>
-                                    <th class="py-2 px-4 border-b">Email</th>
+                                    <th class="py-2 px-4 border-b">Institution Type</th>                                    
+                                    <th class="py-2 px-4 border-b">Location</th>  
+                                    <th class="py-2 px-4 border-b">Status</th>                                  
                                     <th class="py-2 px-4 border-b">Actions</th>
                                 </tr>
                             </thead>
@@ -351,27 +348,72 @@
                                     <tr>
                                         <td class="py-2 px-4 border-b">{{ $saccos->name }}</td>
                                         <td class="py-2 px-4 border-b">{{ $saccos->institution_type }}</td>
+                                        <td class="py-2 px-4 border-b">{{ $saccos->location }}</td>
                                         <td class="py-2 px-4 border-b">
-                                            <button wire:click="toggleStatus({{ $saccos->id }})" class="@if($saccos->status == 'active') bg-green-500 hover:bg-green-700 @else bg-red-500 hover:bg-red-700 @endif text-white font-bold py-1 px-2 rounded" wire:loading.attr="disabled" title="Change Status">
-                                                <span wire:loading.remove wire:target="toggleStatus({{ $saccos->id }})">
+                                            <button wire:click="toggleStatus({{ $saccos->id }})" 
+                                                class="inline-flex items-center px-3 py-1.5 rounded-full text-sm font-medium transition-colors duration-200
+                                                @if($saccos->status == 'active') 
+                                                    bg-green-100 text-green-800 hover:bg-green-200 
+                                                @else 
+                                                    bg-red-100 text-red-800 hover:bg-red-200 
+                                                @endif" 
+                                                wire:loading.attr="disabled" 
+                                                title="Change Status">
+                                                <span wire:loading.remove wire:target="toggleStatus({{ $saccos->id }})" class="flex items-center">
+                                                    <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        @if($saccos->status == 'active')
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                                        @else
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                                        @endif
+                                                    </svg>
                                                     {{ ucfirst($saccos->status) }}
                                                 </span>
-                                                <span wire:loading wire:target="toggleStatus({{ $saccos->id }})">Loading...</span>
+                                                <span wire:loading wire:target="toggleStatus({{ $saccos->id }})" class="flex items-center">
+                                                    <svg class="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                    </svg>
+                                                    Loading...
+                                                </span>
                                             </button>
-                                        </td>
-                                        <td class="py-2 px-4 border-b">{{ $saccos->location }}</td>
-                                        <td class="py-2 px-4 border-b">{{ $saccos->contact_person }}</td>
-                                        <td class="py-2 px-4 border-b">{{ $saccos->phone }}</td>
-                                        <td class="py-2 px-4 border-b">{{ $saccos->email }}</td>
+                                        </td>                                        
                                         <td class="py-2 px-4 border-b">
-                                            <div class="flex items-center space-x-2">
-                                                <button wire:click="viewSaccos({{ $saccos->id }})" class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-2 rounded" wire:loading.attr="disabled">
-                                                    <span wire:loading.remove wire:target="viewSaccos({{ $saccos->id }})">View</span>
-                                                    <span wire:loading wire:target="viewSaccos({{ $saccos->id }})">Loading...</span>
+                                            <div class="flex items-center space-x-3">
+                                                <button wire:click="viewSaccos({{ $saccos->id }})" 
+                                                    class="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium text-blue-700 bg-blue-100 hover:bg-blue-200 transition-colors duration-200" 
+                                                    wire:loading.attr="disabled">
+                                                    <span wire:loading.remove wire:target="viewSaccos({{ $saccos->id }})" class="flex items-center">
+                                                        <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                                                        </svg>
+                                                        View
+                                                    </span>
+                                                    <span wire:loading wire:target="viewSaccos({{ $saccos->id }})" class="flex items-center">
+                                                        <svg class="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                        </svg>
+                                                        Loading...
+                                                    </span>
                                                 </button>
-                                                <button wire:click="editSaccos({{ $saccos->id }})" class="bg-yellow-500 hover:bg-yellow-700 text-white font-bold py-1 px-2 rounded" wire:loading.attr="disabled">
-                                                    <span wire:loading.remove wire:target="editSaccos({{ $saccos->id }})">Edit</span>
-                                                    <span wire:loading wire:target="editSaccos({{ $saccos->id }})">Loading...</span>
+                                                <button wire:click="editSaccos({{ $saccos->id }})" 
+                                                    class="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium text-yellow-700 bg-yellow-100 hover:bg-yellow-200 transition-colors duration-200" 
+                                                    wire:loading.attr="disabled">
+                                                    <span wire:loading.remove wire:target="editSaccos({{ $saccos->id }})" class="flex items-center">
+                                                        <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                                        </svg>
+                                                        Edit
+                                                    </span>
+                                                    <span wire:loading wire:target="editSaccos({{ $saccos->id }})" class="flex items-center">
+                                                        <svg class="animate-spin -ml-1 mr-2 h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                        </svg>
+                                                        Loading...
+                                                    </span>
                                                 </button>
                                             </div>
                                         </td>

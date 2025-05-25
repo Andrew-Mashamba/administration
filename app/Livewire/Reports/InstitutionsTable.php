@@ -19,7 +19,8 @@ class InstitutionsTable extends DataTableComponent
         $this->setPrimaryKey('id');
         $this->setBulkActionsThAttributes([
             'class' => 'bg-blue-500',
-            'default' => true
+            'default' => true,
+            'position' => 'left',
         ]);
       
         $this->setBulkActionsMenuAttributes([
@@ -55,7 +56,8 @@ class InstitutionsTable extends DataTableComponent
                 ->searchable(),
             Column::make('Status', 'status')
                 ->sortable()
-                ->searchable(),
+                ->searchable()
+                ->format(fn($value) => view('livewire.components.status-badge', ['status' => $value])),
             Column::make('Created At', 'created_at')
                 ->sortable()
                 ->format(fn($value) => $value->format('Y-m-d H:i:s')),
