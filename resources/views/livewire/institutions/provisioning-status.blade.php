@@ -76,6 +76,7 @@
             </div>
         </div>
 
+        <div class="bg-white overflow-hidden shadow-sm rounded-lg p-4">
         <!-- Filters -->
         <div class="bg-white overflow-hidden shadow-sm rounded-lg mb-6">
             <div class="p-6">
@@ -239,6 +240,8 @@
                 {{ $statuses->links() }}
             </div>
         </div>
+        </div>
+
     </div>
 
     <!-- SACCO View Modal -->

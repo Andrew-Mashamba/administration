@@ -1,6 +1,5 @@
 <div>
-    {{-- Knowing others is intelligence; knowing yourself is true wisdom. --}}
-        <div class="p-2">           
+     <div class="p-2">           
 
         <!-- Submenu Navigation -->
         <div class="bg-white overflow-hidden shadow-sm rounded-lg mb-6">
@@ -21,7 +20,7 @@
         <!-- Content Area -->
         <div class="overflow-hidden">
             <div class="">
-                <div wire:loading class="w-full p-2">
+                <div wire:loading class="w-full">
                     <div class="flex items-center justify-center min-h-[calc(100vh-4rem)] bg-white w-full rounded-md">
                         <div class="text-center m-auto">
                             <svg xmlns="http://www.w3.org/2000/svg" fill="blue" viewBox="0 0 24 24" stroke-width="1.5"
