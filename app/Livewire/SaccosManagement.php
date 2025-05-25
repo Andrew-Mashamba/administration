@@ -11,6 +11,7 @@ use App\Jobs\ProvisionSaccoJob;
 use Illuminate\Support\Facades\DB;
 use PDO;
 use PDOException;
+use Illuminate\Support\Facades\Log;
 
 class SaccosManagement extends Component
 {
@@ -195,17 +196,6 @@ class SaccosManagement extends Component
                 'status' => 'required|string|max:20',
             ]);
 
-            // Test database connection before saving
-            // try {
-            //     $testConnection = new PDO(
-            //         "pgsql:host={$this->db_host};dbname={$this->db_name}",
-            //         $this->db_user,
-            //         $this->db_password
-            //     );
-            // } catch (PDOException $e) {
-            //     throw new \Exception('Invalid database credentials: ' . $e->getMessage());
-            // }
-
             // Create institution with encrypted sensitive data
             $institution = Institution::create([
                 'name' => $this->name,
@@ -253,7 +243,19 @@ class SaccosManagement extends Component
 
         } catch (\Exception $e) {
             DB::rollBack();
-            session()->flash('error', 'Error: ' . $e->getMessage());
+            
+            // Check if it's a concurrent provisioning error
+            if (str_contains($e->getMessage(), 'Another provisioning process is already in progress')) {
+                session()->flash('error', $e->getMessage());
+            } else {
+                session()->flash('error', 'Error creating institution: ' . $e->getMessage());
+            }
+            
+            // Log the error for debugging
+            Log::error('SACCO creation failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
         } finally {
             $this->isLoading = false;
         }
