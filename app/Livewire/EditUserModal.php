@@ -5,6 +5,8 @@ namespace App\Livewire;
 use Livewire\Component;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 
 class EditUserModal extends Component
 {
@@ -50,13 +52,26 @@ class EditUserModal extends Component
         $this->validate();
 
         if ($this->isNewUser) {
+
+            $password = Str::random(8); // Generate a random password
+
             DB::table('users')->insert([
                 'name' => $this->name,
                 'email' => $this->email,
-                'password' => Hash::make('12345678'),
+                'password' => Hash::make($password),
+                'status' => 'ACTIVE',
                 'created_at' => now(),
                 'updated_at' => now(),
             ]);
+
+            //send email to user
+            $this->sendEmail($this->name, $this->email, $password);
+
+            session()->flash('success', 'User created successfully, and credentials sent via email!');
+
+            $this->reset(['name', 'email']);
+            $this->showModal = false;
+
         } else {
             DB::table('users')
                 ->where('id', $this->userId)
@@ -69,6 +84,22 @@ class EditUserModal extends Component
 
         $this->closeModal();
         $this->dispatch('user-updated');
+    }
+
+
+    public function sendEmail($name, $email, $password)
+    {
+        $url = config('app.url');
+        Mail::send('emails.user-credentials', [
+            'name' => $name,
+            'email' => $email,
+            'password' => $password,
+            'url' => $url,
+        ], function ($message) use ($email, $name) {
+            $message->to($email, $name)
+                    ->subject('Your Login Credentials')
+                    ->from('no-reply@nbc.co.tz');
+        });
     }
 
     public function render()

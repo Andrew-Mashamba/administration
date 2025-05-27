@@ -9,6 +9,8 @@ class Institution extends Component
     public $menu_id = 3;
     public $tab_id = 3;
 
+    public $submenu = 'management';
+
     protected $listeners = ['menuItemClicked'];
 
     public function menuItemClicked($item)
@@ -17,6 +19,10 @@ class Institution extends Component
         $this->tab_id = $item;
     }
 
+    public function switchSubmenu($submenu)
+    {
+        $this->submenu = $submenu;
+    }
 
     public function mount()
     {

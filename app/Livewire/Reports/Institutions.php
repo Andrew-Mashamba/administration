@@ -4,6 +4,7 @@ namespace App\Livewire\Reports;
 
 use Livewire\Component;
 use App\Models\Institution;
+use Illuminate\Support\Facades\DB;
 
 class Institutions extends Component
 {
@@ -17,6 +18,8 @@ class Institutions extends Component
     public $inactiveMicrofinanceInstitutions;
     public $inactiveSaccoInstitutions;
 
+    public $pendingInstitutions;
+
     public function mount()
     {
         $this->totalInstitutions = Institution::count();
@@ -28,6 +31,10 @@ class Institutions extends Component
         $this->activeSaccoInstitutions = Institution::where('institution_type', 'saccos')->where('status', 'active')->count();
         $this->inactiveMicrofinanceInstitutions = Institution::where('institution_type', 'microfinance')->where('status', 'inactive')->count();
         $this->inactiveSaccoInstitutions = Institution::where('institution_type', 'saccos')->where('status', 'inactive')->count();
+
+
+
+        $this->pendingInstitutions = DB::table('provisioning_statuses')->where('status', 'pending')->count();
     }
     public function render()
     {

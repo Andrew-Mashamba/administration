@@ -3,11 +3,15 @@
 namespace App\Livewire\Users;
 
 use Livewire\Component;
+use App\Models\User;
 
 class Users extends Component
 {
     public $menu_id = 2;
     public $tab_id = 2;
+    public $totalUsers = 0;
+    public $activeUsers = 0;
+    public $inactiveUsers = 0;
 
     protected $listeners = ['menuItemClicked'];
 
@@ -19,7 +23,14 @@ class Users extends Component
 
     public function mount()
     {
-        // $this->menu_id = 1;
+        $this->calculateUserStatistics();
+    }
+
+    public function calculateUserStatistics()
+    {
+        $this->totalUsers = User::count();
+        $this->activeUsers = User::where('status', 'ACTIVE')->count();
+        $this->inactiveUsers = User::where('status', 'INACTIVE')->count();
     }
 
     public function render()

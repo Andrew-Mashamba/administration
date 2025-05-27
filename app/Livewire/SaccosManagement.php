@@ -22,7 +22,14 @@ class SaccosManagement extends Component
     public $isCreating = false;
     public $isEditing = false;
     public $editingId = null;
-    public $isLoading = false;
+    // public $isLoading = false;
+    public $totalInstitutions;
+    public $activeInstitutions;
+    public $inactiveInstitutions;
+    public $pendingInstitutions;
+    public $provisioningInstitutions;
+    public $provisionedInstitutions;
+    public $failedInstitutions;
 
     // Basic Information
     public $name;
@@ -49,6 +56,42 @@ class SaccosManagement extends Component
     // IT Information
     public $it_email;
     public $it_phone_number;
+
+    public $submenu;
+
+    public $search = '';
+
+    public function mount()
+    {
+        $this->submenu = 'management'; //default submenu
+        $this->totalInstitutions = Institution::count();
+        $this->activeInstitutions = Institution::where('status', 'active')->count();
+        $this->inactiveInstitutions = Institution::where('status', 'inactive')->count();
+        $this->microfinanceInstitutions = Institution::where('institution_type', 'microfinance')->count();
+        $this->pendingInstitutions = Institution::where('status', 'pending')->count();
+        $this->saccoInstitutions = Institution::where('institution_type', 'saccos')->count();
+        $this->activeMicrofinanceInstitutions = Institution::where('institution_type', 'microfinance')->where('status', 'active')->count();
+        $this->activeSaccoInstitutions = Institution::where('institution_type', 'saccos')->where('status', 'active')->count();
+        $this->inactiveMicrofinanceInstitutions = Institution::where('institution_type', 'microfinance')->where('status', 'inactive')->count();
+        $this->inactiveSaccoInstitutions = Institution::where('institution_type', 'saccos')->where('status', 'inactive')->count();
+       
+    }
+    
+    // public function institutionsCount()
+    // {
+    //         $totalInstitutions = Institution::count();
+    //         $activeInstitutions = Institution::where('status', 'active')->count();
+    //         $inactiveInstitutions = Institution::where('status', 'inactive')->count();
+    //         $microfinanceInstitutions = Institution::where('institution_type', 'microfinance')->count();
+    //         $saccoInstitutions = Institution::where('institution_type', 'saccos')->count();
+    //         $activeMicrofinanceInstitutions = Institution::where('institution_type', 'microfinance')->where('status', 'active')->count();
+    //         $activeSaccoInstitutions = Institution::where('institution_type', 'saccos')->where('status', 'active')->count();
+    //         $inactiveMicrofinanceInstitutions = Institution::where('institution_type', 'microfinance')->where('status', 'inactive')->count();
+    //         $inactiveSaccoInstitutions = Institution::where('institution_type', 'saccos')->where('status', 'inactive')->count();
+          
+        
+    // }
+
 
     // protected $rules = [
     //     'name' => 'required|min:3',
@@ -325,6 +368,14 @@ class SaccosManagement extends Component
         ]);
     }
 
+    public function cancelView()
+    {
+        $this->isViewing = false;
+        $this->isEditing = false;
+        $this->isCreating = false;
+        $this->editingId = null;
+    }
+
     public function cancelCreate()
     {
         $this->isCreating = false;
@@ -336,10 +387,17 @@ class SaccosManagement extends Component
         ]);
     }
 
+    public function switchSubmenu($submenu)
+    {
+        $this->submenu = $submenu;
+    }
+
     public function render()
     {
         return view('livewire.saccos-management', [
-            'saccosList' => Institution::paginate(10),
+            'saccosList' => Institution::when($this->search, function($query) {
+                $query->where('name', 'like', '%' . $this->search . '%');
+            })->paginate(10),
         ]);
     }
 }
