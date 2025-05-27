@@ -16,7 +16,7 @@ use App\Http\Controllers\Api\BillsPaymentController;
 */
 
 // NBC Bills Payment API Routes
-Route::prefix('bills-payments-api/api/v1')->group(function () {
+Route::prefix('bills-payments-api/v1')->group(function () {
     Route::post('/inquiry', [BillsPaymentController::class, 'inquiry']);
     Route::post('/payment', [BillsPaymentController::class, 'payment']);
     Route::post('/status-check', [BillsPaymentController::class, 'statusCheck']);
@@ -27,3 +27,18 @@ Route::get('/user', function (Request $request) {
 })->middleware('auth:sanctum');
 
 
+Route::prefix('1')->group(function () {
+    Route::get('/2/{institution_id}/{member_id}', [BillsPaymentController::class, 'inquiryGet']);
+    Route::post('/3', [BillsPaymentController::class, 'payment']);
+    Route::post('/4', [BillsPaymentController::class, 'statusCheck']);
+});
+
+Route::prefix('7')->group(function () {
+    Route::get('/', function () {
+        return response()->json([
+            'status' => 'success',
+            'message' => 'Test route working',
+            'data' => '2'
+        ]);
+    });
+});
