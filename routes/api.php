@@ -22,6 +22,10 @@ Route::prefix('bills-payments-api/v1')->group(function () {
     Route::post('/status-check', [BillsPaymentController::class, 'statusCheck']);
 });
 
+Route::prefix('log-call-back')->group(function () {
+    Route::post('/', [BillsPaymentController::class, 'logCallBack']);
+});
+
 Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
@@ -42,3 +46,4 @@ Route::prefix('7')->group(function () {
         ]);
     });
 });
+

@@ -527,4 +527,13 @@ class BillsPaymentController extends Controller
             ], 500);
         }
     }
+
+
+    public function logCallBack(Request $request)
+    {
+        Log::info('Received call back request', [
+            'request_id' => uniqid(),
+            'request_data' => $request->all()
+        ]);
+    }
 }
